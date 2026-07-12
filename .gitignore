@@ -1,0 +1,45 @@
+# --- secrets ---
+.env
+
+# --- data (large / regenerable) ---
+data/raw/
+data/processed/
+
+# --- models (large binaries) ---
+ml/models/
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.h5
+*.onnx
+
+# --- graph embeddings/exports (regenerable) ---
+graph/embeddings/
+graph/exports/
+
+# --- python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- node / frontend ---
+node_modules/
+web/dist/
+web/build/
+.vite/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- generated reports ---
+*.pdf
+!Docs/source/*.pdf

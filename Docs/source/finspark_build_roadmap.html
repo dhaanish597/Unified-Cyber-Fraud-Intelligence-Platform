@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinSpark'26 — Build Plan &amp; 5-Day Sprint Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a1519;          /* base bg */
+    --ink-2:#0e1e24;        /* deeper panel */
+    --surface:#12262d;      /* card */
+    --surface-2:#173038;    /* raised card */
+    --line:#22434c;         /* hairline */
+    --teal:#2ba6bd;         /* signal / fusion */
+    --teal-dim:#1c7688;
+    --gold:#e8b84b;         /* Bank of Maharashtra accent */
+    --red:#e5484d;          /* BLOCK / critical */
+    --amber:#f2a43a;        /* CHALLENGE */
+    --green:#46b17b;        /* ALLOW / done */
+    --text:#dce8ec;
+    --muted:#82a0a8;
+    --muted-2:#5c7a82;
+    --shadow:0 18px 50px -20px rgba(0,0,0,.65);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--ink);color:var(--text);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(1100px 500px at 82% -8%, rgba(43,166,189,.10), transparent 60%),
+      radial-gradient(900px 520px at 5% 4%, rgba(232,184,75,.06), transparent 55%);
+  }
+  .mono{font-family:"IBM Plex Mono",monospace}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 26px}
+
+  /* ---- top nav ---- */
+  nav{
+    position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+    background:rgba(10,21,25,.82);border-bottom:1px solid var(--line);
+  }
+  nav .wrap{display:flex;align-items:center;gap:20px;height:56px;overflow-x:auto;scrollbar-width:none}
+  nav .wrap::-webkit-scrollbar{display:none}
+  nav .brand{font-family:"Space Grotesk";font-weight:700;color:var(--gold);white-space:nowrap;letter-spacing:.3px}
+  nav a{color:var(--muted);text-decoration:none;font-size:13px;white-space:nowrap;font-family:"IBM Plex Mono";transition:color .15s}
+  nav a:hover{color:var(--teal)}
+
+  /* ---- hero ---- */
+  header{padding:64px 0 40px;border-bottom:1px solid var(--line);position:relative}
+  .eyebrow{font-family:"IBM Plex Mono";font-size:12.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--teal);margin-bottom:18px}
+  h1{font-family:"Space Grotesk";font-weight:700;font-size:clamp(2rem,5vw,3.35rem);line-height:1.04;letter-spacing:-.02em;margin:0 0 18px}
+  h1 .accent{color:var(--gold)}
+  .lede{font-size:1.12rem;color:var(--muted);max-width:730px;margin:0 0 30px}
+  .lede strong{color:var(--text);font-weight:600}
+
+  .tmeta{display:flex;flex-wrap:wrap;gap:14px;margin-top:6px}
+  .chip{border:1px solid var(--line);background:var(--ink-2);border-radius:10px;padding:12px 16px;min-width:150px}
+  .chip .k{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted-2)}
+  .chip .v{font-family:"Space Grotesk";font-weight:600;font-size:1.15rem;margin-top:3px}
+  .chip.hot{border-color:rgba(229,72,77,.5)}
+  .chip.hot .v{color:var(--red)}
+  .chip.gold .v{color:var(--gold)}
+
+  /* ---- sections ---- */
+  section{padding:52px 0;border-bottom:1px solid var(--line)}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:8px}
+  .sec-num{font-family:"IBM Plex Mono";color:var(--teal-dim);font-size:14px;font-weight:600}
+  h2{font-family:"Space Grotesk";font-weight:600;font-size:1.72rem;letter-spacing:-.01em;margin:0}
+  .sec-sub{color:var(--muted);margin:2px 0 26px;max-width:760px}
+  h3{font-family:"Space Grotesk";font-weight:600;font-size:1.16rem;margin:30px 0 10px;color:var(--text)}
+  p{margin:0 0 14px}
+  a.link{color:var(--teal);text-decoration:none;border-bottom:1px solid rgba(43,166,189,.35)}
+  a.link:hover{border-color:var(--teal)}
+
+  .callout{
+    border:1px solid rgba(229,72,77,.4);background:linear-gradient(180deg,rgba(229,72,77,.08),rgba(229,72,77,.02));
+    border-radius:14px;padding:22px 24px;margin:6px 0 4px;position:relative;
+  }
+  .callout.teal{border-color:rgba(43,166,189,.4);background:linear-gradient(180deg,rgba(43,166,189,.09),rgba(43,166,189,.02))}
+  .callout.gold{border-color:rgba(232,184,75,.4);background:linear-gradient(180deg,rgba(232,184,75,.09),rgba(232,184,75,.02))}
+  .callout .tag{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--red);font-weight:600;display:block;margin-bottom:6px}
+  .callout.teal .tag{color:var(--teal)}
+  .callout.gold .tag{color:var(--gold)}
+  .callout p:last-child{margin-bottom:0}
+
+  /* cards / grid */
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  .card h4{font-family:"Space Grotesk";font-weight:600;font-size:1.02rem;margin:0 0 8px;display:flex;align-items:center;gap:9px}
+  .card p{font-size:.95rem;color:var(--muted);margin:0}
+  .card p + p{margin-top:8px}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .dot.teal{background:var(--teal)}.dot.gold{background:var(--gold)}.dot.red{background:var(--red)}.dot.green{background:var(--green)}.dot.amber{background:var(--amber)}
+
+  /* tables */
+  .tbl{width:100%;border-collapse:collapse;margin:8px 0;font-size:.92rem;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .tbl th{background:var(--ink-2);text-align:left;padding:12px 14px;font-family:"IBM Plex Mono";font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+  .tbl td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--text)}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl td.b{color:var(--muted)}
+  .tbl .build{color:var(--green);font-weight:600}
+  .tbl .desc{color:var(--amber);font-weight:600}
+
+  ul.clean{list-style:none;padding:0;margin:0 0 8px}
+  ul.clean li{padding:7px 0 7px 26px;position:relative;color:var(--text);font-size:.96rem;border-bottom:1px solid rgba(34,67,76,.5)}
+  ul.clean li:last-child{border-bottom:none}
+  ul.clean li::before{content:"▸";position:absolute;left:4px;color:var(--teal);font-size:.85rem;top:8px}
+  ul.clean li b{color:var(--gold);font-weight:600}
+  code{font-family:"IBM Plex Mono";background:var(--ink-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.85em;color:#a9d9e3}
+
+  /* timeline / day cards */
+  .day{display:grid;grid-template-columns:88px 1fr;gap:0;margin-bottom:18px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surface)}
+  .day .rail{background:var(--ink-2);border-right:1px solid var(--line);padding:20px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .day .rail .d{font-family:"Space Grotesk";font-weight:700;font-size:1.5rem;color:var(--gold)}
+  .day .rail .dd{font-family:"IBM Plex Mono";font-size:10px;letter-spacing:1px;color:var(--muted-2);text-transform:uppercase}
+  .day .rail .dow{font-family:"IBM Plex Mono";font-size:11px;color:var(--teal);margin-top:2px}
+  .day .body{padding:20px 22px}
+  .day .body .goal{font-family:"Space Grotesk";font-weight:600;font-size:1.08rem;margin:0 0 12px;color:var(--text)}
+  .task{display:flex;gap:11px;padding:7px 0;font-size:.94rem;align-items:flex-start;border-bottom:1px solid rgba(34,67,76,.45)}
+  .task:last-of-type{border-bottom:none}
+  .task .box{width:15px;height:15px;border:1.5px solid var(--teal-dim);border-radius:4px;flex:none;margin-top:4px}
+  .task .txt{color:var(--text)}
+  .task .txt b{color:var(--gold);font-weight:600}
+  .lbl{font-family:"IBM Plex Mono";font-size:10px;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:5px;font-weight:600;white-space:nowrap;margin-left:auto;flex:none;margin-top:3px}
+  .lbl.data{background:rgba(43,166,189,.16);color:var(--teal)}
+  .lbl.ml{background:rgba(232,184,75,.16);color:var(--gold)}
+  .lbl.fe{background:rgba(70,177,123,.16);color:var(--green)}
+  .lbl.ops{background:rgba(242,164,58,.16);color:var(--amber)}
+  .deliver{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);font-size:.88rem;color:var(--muted)}
+  .deliver b{color:var(--teal);font-family:"IBM Plex Mono";font-size:11px;letter-spacing:1px;text-transform:uppercase}
+  .warn-inline{background:rgba(242,164,58,.1);border:1px solid rgba(242,164,58,.35);border-radius:8px;padding:9px 12px;margin-top:12px;font-size:.86rem;color:#f5c98a}
+  .warn-inline b{color:var(--amber)}
+
+  /* demo script steps */
+  .step{display:grid;grid-template-columns:64px 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:none}
+  .step .t{font-family:"IBM Plex Mono";font-weight:600;color:var(--teal);font-size:.9rem;padding-top:2px}
+  .step .t.block{color:var(--red)}
+  .step .c b{color:var(--gold)}
+
+  .footer{padding:44px 0 60px;color:var(--muted-2);font-size:.86rem}
+  .footer .mono{color:var(--muted)}
+
+  .pill{display:inline-block;font-family:"IBM Plex Mono";font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:20px;border:1px solid var(--line);color:var(--muted);margin:0 6px 6px 0}
+  .pill.on{border-color:var(--teal);color:var(--teal)}
+
+  .reveal{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+
+  .kbd{font-family:"IBM Plex Mono";background:var(--ink-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:2px 7px;font-size:.82em}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <span class="brand">FINSPARK'26 ◆ BUILD</span>
+    <a href="#thesis">Thesis</a>
+    <a href="#scope">Scope</a>
+    <a href="#data">Data</a>
+    <a href="#stack">Stack</a>
+    <a href="#roadmap">5-Day Sprint</a>
+    <a href="#demo">Demo Script</a>
+    <a href="#edge">Win Edge</a>
+    <a href="#qa">Judge Q&amp;A</a>
+    <a href="#ship">Ship List</a>
+  </div>
+</nav>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Bank of Maharashtra · Problem Statement 2 · Cyber ↔ Fraud Correlation</div>
+    <h1>The <span class="accent">Domain Fusion</span> Sprint<br>Build plan &amp; day-by-day roadmap</h1>
+    <p class="lede">A hackathon-realistic plan to ship a <strong>working vertical slice</strong> of your Unified Cyber-Fraud Intelligence Platform — one that makes a single idea undeniable: <strong>a cyber compromise and the fraudulent transfer that follows it are one attack, and only a fused engine catches both halves.</strong></p>
+    <div class="tmeta">
+      <div class="chip hot"><div class="k">Prototype due</div><div class="v">16 Jul 2026</div></div>
+      <div class="chip hot"><div class="k">Today · time left</div><div class="v">~5 days</div></div>
+      <div class="chip gold"><div class="k">Mentoring 2</div><div class="v">13 Jul · 7 PM</div></div>
+      <div class="chip"><div class="k">Finale · COEP Pune</div><div class="v">25–26 Jul</div></div>
+    </div>
+  </div>
+</header>
+
+<!-- ================= THESIS ================= -->
+<section id="thesis">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="sec-num">01</span><h2>The winning thesis</h2></div>
+    <p class="sec-sub">You are not being judged on a 12-month enterprise platform. You are being judged on whether one fused, explainable, quantum-aware demo convinces a room of bankers and security leaders. Everything below serves that.</p>
+
+    <div class="callout teal">
+      <span class="tag">The one sentence to win on</span>
+      <p style="margin:0;font-size:1.08rem;color:var(--text)"><em>"A SIEM sees the stolen login. A fraud engine sees the transfer. Neither sees that they're the same attack — happening 40 seconds apart. Our platform fuses them into one graph and blocks the transfer while it's still in flight."</em></p>
+    </div>
+
+    <h3>Why this beats the field</h3>
+    <p>The market gap in your dossier is real and correct: SIEMs (Splunk, Sentinel) read IT telemetry but not transactions; fraud platforms (Feedzai, Mastercard DI) read transactions but not the cyber precursor. Your differentiator is the <b style="color:var(--gold)">correlation itself</b> — so the demo must <em>show</em> the correlation catching a fraud that each silo would miss alone. That single moment is worth more than any architecture slide.</p>
+
+    <div class="callout">
+      <span class="tag">Reality check — read this first</span>
+      <p>Your dossier describes Go microservices + Flink + Kafka + Neo4j + K8s + Federated Learning across a 12-month, 5-phase build. <b style="color:var(--red)">You have five days.</b> Do not try to build that. Build the slice that produces the demo above; keep the full architecture in the deck as your <em>vision &amp; roadmap</em>. Judges expect a prototype, not production — a live, honest slice beats an over-scoped skeleton every time.</p>
+    </div>
+
+    <h3>Pick PS2 — mention PS1 as a bonus</h3>
+    <p>Register for <b style="color:var(--gold)">Problem Statement 2 (AI-driven correlation of cybersecurity telemetry &amp; transactional behaviour)</b>. ~90% of your materials already target it, and the fusion demo maps to every one of its expected outcomes. Your Oracle-Fusion "supplier bank-account change → immediate payment" scenario also covers <b style="color:var(--gold)">PS1 (privileged-access misuse / insider threat)</b> — mention that verbally as a capability the same engine gives you for free, but don't split your build across two statements.</p>
+  </div>
+</section>
+
+<!-- ================= SCOPE ================= -->
+<section id="scope">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Scoped MVP — build vs. describe</h2></div>
+    <p class="sec-sub">The discipline that wins hackathons: a short list you <em>build and demo live</em>, and a longer list you <em>describe convincingly</em> in the deck. Anything you can't demo, you narrate.</p>
+
+    <table class="tbl">
+      <thead><tr><th>Capability</th><th>Decision</th><th>What "done" means for the demo</th></tr></thead>
+      <tbody>
+        <tr><td><b>Fused risk engine</b> (cyber-context + tabular + graph → ALLOW/CHALLENGE/BLOCK)</td><td class="build">BUILD</td><td class="b">A single <code>/evaluate</code> call returns action + score + reasons, and visibly changes verdict when a prior cyber event exists.</td></tr>
+        <tr><td><b>Tabular fraud model</b> (XGBoost/LightGBM + SMOTE)</td><td class="build">BUILD</td><td class="b">Trained on PaySim/IEEE-CIS, real PR-AUC &amp; confusion matrix saved.</td></tr>
+        <tr><td><b>Graph model</b> (GraphSAGE embeddings + centrality)</td><td class="build">BUILD</td><td class="b">Mule-ring detection on Elliptic; embeddings feed the risk engine.</td></tr>
+        <tr><td><b>Anomaly / zero-day</b> (Isolation Forest or Autoencoder)</td><td class="build">BUILD</td><td class="b">Reconstruction/isolation score on unseen patterns.</td></tr>
+        <tr><td><b>Single pane of glass</b> dashboard (dark UI)</td><td class="build">BUILD</td><td class="b">SIEM timeline · ledger · fused score · XAI panel · threat graph.</td></tr>
+        <tr><td><b>XAI panel</b> (SHAP + counterfactual line)</td><td class="build">BUILD</td><td class="b">Per-decision feature attributions + "what would flip this" sentence.</td></tr>
+        <tr><td><b>Quantum Risk Monitor</b> (cipher-suite posture)</td><td class="build">BUILD (mini)</td><td class="b">Parse TLS handshakes → % quantum-vulnerable gauge + HNDL rule.</td></tr>
+        <tr><td><b>CERT-In 6-hr auto-report</b> generator</td><td class="build">BUILD (mini)</td><td class="b">One click → a structured incident PDF. Huge for a bank jury.</td></tr>
+        <tr><td>Real-time streaming</td><td class="desc">SIMULATE</td><td class="b">WebSocket replay of events from CSV — looks live, no Kafka needed.</td></tr>
+        <tr><td>Kafka / Flink / Go microservices</td><td class="desc">DESCRIBE</td><td class="b">In deck as production architecture; not built.</td></tr>
+        <tr><td>Federated Learning + differential privacy</td><td class="desc">DESCRIBE</td><td class="b">In deck as "cross-bank future scope" (ε=1.5, δ=10⁻⁵).</td></tr>
+        <tr><td>Kubernetes / Terraform / MLflow / Seldon</td><td class="desc">DESCRIBE</td><td class="b">Deployment story only; single FastAPI service for the demo.</td></tr>
+      </tbody>
+    </table>
+    <div class="warn-inline"><b>Rule of thumb:</b> if a component doesn't make the 90-second demo more convincing, it goes in the "describe" column. Protect the five days ruthlessly.</div>
+  </div>
+</section>
+
+<!-- ================= DATA ================= -->
+<section id="data">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Data plan &amp; the fusion overlay</h2></div>
+    <p class="sec-sub">This section is your real technical contribution. Get the datasets today; the synthetic fusion overlay is what lets you demonstrate an advantage no single dataset can show.</p>
+
+    <h3>Datasets to pull now (all free, all Kaggle unless noted)</h3>
+    <table class="tbl">
+      <thead><tr><th>Dataset</th><th>Role in the build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><b>PaySim</b><br><span class="mono" style="font-size:.8rem;color:var(--muted-2)">ealaxi/paysim1</span></td><td class="b">Transaction backbone for the tabular fraud model.</td><td class="b">6.3M mobile-money txns, fraud only 0.129%. Fraud lives in <code>TRANSFER</code> + <code>CASH_OUT</code>. Perfect imbalance story.</td></tr>
+        <tr><td><b>IEEE-CIS Fraud</b><br><span class="mono" style="font-size:.8rem;color:var(--muted-2)">ieee-fraud-detection</span></td><td class="b"><em>Strongly recommended</em> — it already joins a transaction table with a device/identity table.</td><td class="b">Gives you real device fingerprint + browser features, so your "fusion" narrative isn't purely synthetic.</td></tr>
+        <tr><td><b>Elliptic Bitcoin</b><br><span class="mono" style="font-size:.8rem;color:var(--muted-2)">ellipticco/elliptic-data-set</span></td><td class="b">Graph model demo — GraphSAGE on a real labelled transaction graph.</td><td class="b">~203k nodes, 234k edges, 166 features, licit/illicit labels. Cleanest way to show mule-ring detection live.</td></tr>
+        <tr><td><b>UNSW-NB15</b> or <b>CICIDS2017</b></td><td class="b">Cyber-intrusion side: login anomalies, lateral movement, C2 patterns.</td><td class="b">Source of the "cyber signal" you overlay onto transactions.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout gold">
+      <span class="tag">Your contribution — the fusion overlay</span>
+      <p style="margin:0 0 10px">No public dataset links a user's login/cyber events to their fraud transactions. That gap <em>is</em> the market gap. So you synthesize the link — and this becomes your defensible, reproducible innovation:</p>
+      <ul class="clean" style="margin-top:4px">
+        <li>Take the transaction backbone (PaySim / IEEE-CIS) and assign each row a synthetic <b>user_id</b>, <b>device</b>, and <b>IP</b>.</li>
+        <li>Generate a per-user <b>cyber event log</b>: mostly normal logins, plus injected compromise sequences drawn from UNSW-NB15 patterns — impossible-travel login, new-device MFA-cookie reuse, credential-stuffing success.</li>
+        <li>For a chosen slice of frauds, place a <b>cyber-compromise event 30–120 s before</b> the fraudulent transfer. This is the correlated signal.</li>
+        <li>Define a <b>fused label</b>: a transaction is high-risk if a compromise event for that user fired inside the pre-window. Now your engine can <em>learn and prove</em> the correlation.</li>
+        <li>The headline metric becomes the <b>fusion uplift</b>: recall on "cyber-preceded" frauds for the tabular-only baseline vs. the fused engine. The delta is your story.</li>
+      </ul>
+    </div>
+    <p style="margin-top:16px">Frame it honestly to judges as a <b style="color:var(--gold)">controlled evaluation harness</b>: you're not claiming a real bank's joined data; you're demonstrating that <em>when</em> the correlation exists, fusion recovers frauds the silos miss. That is exactly the point a bank CISO wants proven.</p>
+  </div>
+</section>
+
+<!-- ================= STACK ================= -->
+<section id="stack">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Tech stack — hackathon-realistic</h2></div>
+    <p class="sec-sub">Trimmed to what one strong builder can ship in five days. Your ANVESHA (Neo4j + multi-agent) and Harlps (React Native + real-time) experience maps directly onto this.</p>
+
+    <div class="grid g2">
+      <div class="card"><h4><span class="dot gold"></span>ML &amp; graph</h4><p>Python · pandas · scikit-learn · <code>xgboost</code>/<code>lightgbm</code> · <code>imbalanced-learn</code> (SMOTE) · <b>PyTorch Geometric</b> (GraphSAGE) · <code>shap</code>. Isolation Forest for zero-day.</p></div>
+      <div class="card"><h4><span class="dot teal"></span>Backend</h4><p>Single <b>FastAPI</b> service exposing <code>POST /evaluate/transaction</code> and a <b>WebSocket</b> for the live event stream. No microservices, no Go — one process.</p></div>
+      <div class="card"><h4><span class="dot green"></span>Frontend</h4><p><b>React + Vite + Tailwind</b>. Graph viz via <code>react-force-graph-2d</code> or <code>vis-network</code>. KPIs via <code>recharts</code>. Dark SOC theme (red/amber/green severity).</p></div>
+      <div class="card"><h4><span class="dot amber"></span>Graph store</h4><p><b>Neo4j Aura Free</b> (you already know Neo4j from ANVESHA) for the identity/attack graph + Cypher. Fallback: <code>networkx</code> in-memory if Aura setup eats time.</p></div>
+      <div class="card"><h4><span class="dot teal"></span>"Streaming"</h4><p>A replay script reads events from CSV and pushes them over WebSocket at demo speed — <em>looks</em> real-time without Kafka/Flink. Show Kafka in the deck diagram only.</p></div>
+      <div class="card"><h4><span class="dot gold"></span>Deploy (optional polish)</h4><p>Backend on <b>Render/Railway</b>, frontend on <b>Vercel</b> → a public link in your submission. Local is fine for the live demo; a link raises perceived polish.</p></div>
+    </div>
+
+    <h3>Repo layout</h3>
+    <ul class="clean">
+      <li><code>/data</code> — download scripts + the <b>fusion overlay generator</b> (the star script).</li>
+      <li><code>/ml</code> — training notebooks/scripts, saved models, metrics report.</li>
+      <li><code>/graph</code> — Cypher schema, GraphSAGE training, embedding export.</li>
+      <li><code>/api</code> — FastAPI service, risk engine, XAI, CERT-In report generator.</li>
+      <li><code>/web</code> — React dashboard.</li>
+      <li><code>/docs</code> — architecture diagram, README, demo script, metrics.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= ROADMAP ================= -->
+<section id="roadmap">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="sec-num">05</span><h2>The 5-day sprint · Jul 11 → Jul 16</h2></div>
+    <p class="sec-sub">Ordered so all ML lands by the 13th — protecting the July 14 MSME-hackathon collision and leaving the back half for the parts judges actually see. Tag key: <span class="lbl data">DATA</span> <span class="lbl ml">ML</span> <span class="lbl fe">FRONTEND</span> <span class="lbl ops">OPS/POLISH</span></p>
+
+    <!-- Day 0 -->
+    <div class="day">
+      <div class="rail"><div class="dd">Jul</div><div class="d">11</div><div class="dow">SAT · today</div></div>
+      <div class="body">
+        <p class="goal">Foundation &amp; the fusion dataset</p>
+        <div class="task"><span class="box"></span><span class="txt">Lock scope to the PS2 slice; register for <b>Problem Statement 2</b>.</span><span class="lbl ops">OPS</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Download PaySim, IEEE-CIS, Elliptic, UNSW-NB15. Scaffold the monorepo.</span><span class="lbl data">DATA</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Fast EDA: confirm class imbalance, transaction types, device/identity columns.</span><span class="lbl data">DATA</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Write the <b>fusion overlay generator</b> — synthetic user/device/IP + injected cyber-compromise events preceding a fraud slice. This is the day's real deliverable.</span><span class="lbl data">DATA</span></div>
+        <div class="deliver"><b>End of day →</b> a correlated <code>fused_events.csv</code> + <code>transactions.csv</code>, and a clean repo. If only one thing works today, make it the overlay.</div>
+      </div>
+    </div>
+
+    <!-- Day 1 -->
+    <div class="day">
+      <div class="rail"><div class="dd">Jul</div><div class="d">12</div><div class="dow">SUN</div></div>
+      <div class="body">
+        <p class="goal">Tabular + anomaly models, honest metrics</p>
+        <div class="task"><span class="box"></span><span class="txt">Feature engineering: velocity, balance deltas, time-since-last, log-scaled amount.</span><span class="lbl ml">ML</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Train XGBoost/LightGBM with SMOTE on the training split only. Save the model.</span><span class="lbl ml">ML</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Train Isolation Forest (or a small Autoencoder) for zero-day / unseen patterns.</span><span class="lbl ml">ML</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Report <b>PR-AUC, F1, recall @ fixed low FPR</b> + confusion matrix. No accuracy-only claims.</span><span class="lbl ml">ML</span></div>
+        <div class="deliver"><b>End of day →</b> saved models + a one-page metrics report you can defend line-by-line.</div>
+      </div>
+    </div>
+
+    <!-- Day 2 -->
+    <div class="day">
+      <div class="rail"><div class="dd">Jul</div><div class="d">13</div><div class="dow">MON</div></div>
+      <div class="body">
+        <p class="goal">Graph model + the fusion risk engine</p>
+        <div class="task"><span class="box"></span><span class="txt">Build the account/device/IP graph (Neo4j Aura or networkx). Load Elliptic for the GNN.</span><span class="lbl ml">ML</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Train GraphSAGE → node embeddings; compute PageRank / betweenness / Louvain features.</span><span class="lbl ml">ML</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Build the <b>Fusion Risk Engine</b>: blend tabular score + graph features + a cyber-context rule (compromise-in-window) → <b>ALLOW / CHALLENGE / BLOCK</b> + reason list.</span><span class="lbl ml">ML</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Compute the <b>fusion uplift</b>: baseline vs. fused recall on cyber-preceded frauds.</span><span class="lbl ml">ML</span></div>
+        <div class="warn-inline"><b>⚠ 7:00–8:00 PM — Mentoring Session 2.</b> Come with sharp questions: (1) "Is a synthetic cyber-fraud correlation overlay acceptable as our evaluation harness?" (2) "Which compliance hook impresses the Bank of Maharashtra jury most — CERT-In auto-report or DPDP consent?" (3) "For the finale, live demo or recorded?" Ask what <em>they'd</em> want to see on stage.</div>
+        <div class="deliver"><b>End of day →</b> all ML done. From here it's the parts judges see.</div>
+      </div>
+    </div>
+
+    <!-- Day 3 -->
+    <div class="day">
+      <div class="rail"><div class="dd">Jul</div><div class="d">14</div><div class="dow">TUE</div></div>
+      <div class="body">
+        <p class="goal">API + dashboard + XAI (the single pane of glass)</p>
+        <div class="task"><span class="box"></span><span class="txt">FastAPI: <code>/evaluate/transaction</code> wraps the risk engine; WebSocket replay pushes the event stream.</span><span class="lbl fe">FRONTEND</span></div>
+        <div class="task"><span class="box"></span><span class="txt">React dashboard: KPI header (TPS, threat level, ₹ intercepted/24h), SIEM timeline (left), ledger (right), fused score + verdict (center).</span><span class="lbl fe">FRONTEND</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Threat Graph Visualizer: click a mule node → expand linked devices/IPs/destinations.</span><span class="lbl fe">FRONTEND</span></div>
+        <div class="task"><span class="box"></span><span class="txt">XAI panel: SHAP top features + one <b>counterfactual sentence</b> ("if login distance &lt; 50 km, verdict = ALLOW").</span><span class="lbl fe">FRONTEND</span></div>
+        <div class="warn-inline"><b>⚠ MSME Idea Hackathon 6.0 also submits today.</b> That's why ML was front-loaded — this evening is for the frontend, not model debugging.</div>
+        <div class="deliver"><b>End of day →</b> an end-to-end clickable dashboard driven by real model output.</div>
+      </div>
+    </div>
+
+    <!-- Day 4 -->
+    <div class="day">
+      <div class="rail"><div class="dd">Jul</div><div class="d">15</div><div class="dow">WED</div></div>
+      <div class="body">
+        <p class="goal">Quantum + compliance + the demo scenario</p>
+        <div class="task"><span class="box"></span><span class="txt">Quantum Risk Monitor: classify TLS cipher suites into quantum-vulnerable (RSA/ECDHE) vs hybrid/PQC (ML-KEM); render a posture gauge + an HNDL "long-lived data egress" rule.</span><span class="lbl fe">FRONTEND</span></div>
+        <div class="task"><span class="box"></span><span class="txt">CERT-In generator: one click → structured incident PDF (within the 6-hour mandate).</span><span class="lbl ops">OPS</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Wire the <b>killer demo scenario</b> (Section 06) end-to-end as a scripted replay.</span><span class="lbl ops">OPS</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Record a crisp <b>3-minute demo video</b> — steady screen capture + voiceover.</span><span class="lbl ops">OPS</span></div>
+        <div class="deliver"><b>End of day →</b> the full story runs on one keypress, and it's captured on video as a safety net.</div>
+      </div>
+    </div>
+
+    <!-- Day 5 -->
+    <div class="day">
+      <div class="rail"><div class="dd">Jul</div><div class="d">16</div><div class="dow">THU · DUE</div></div>
+      <div class="body">
+        <p class="goal">Buffer, polish, submit</p>
+        <div class="task"><span class="box"></span><span class="txt">README with architecture diagram + how-to-run; clean the repo; make it public.</span><span class="lbl ops">OPS</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Fill every deck placeholder: team name, repo link, demo-video link, real screenshots (Slides 1, 7, 15, 16).</span><span class="lbl ops">OPS</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Add the "PS2 coverage checklist" slide — map each expected outcome to a visible UI element.</span><span class="lbl ops">OPS</span></div>
+        <div class="task"><span class="box"></span><span class="txt">Submit <b>hours early</b>. Deadline days always have portal congestion.</span><span class="lbl ops">OPS</span></div>
+        <div class="deliver"><b>Submitted.</b> Then the window to the finale (25–26 Jul) is for hardening the live demo and rehearsing Q&amp;A.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DEMO ================= -->
+<section id="demo">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="sec-num">06</span><h2>The killer demo · 90 seconds</h2></div>
+    <p class="sec-sub">One scripted scenario that hits every PS2 expected outcome. Rehearse it until the timing is muscle memory — the T-values on screen are what sell "real-time."</p>
+
+    <div class="step"><div class="t">T−0:00</div><div class="c"><b>Calm.</b> Dashboard green. TPS ticking, threat level low. "This is a normal Tuesday for the bank."</div></div>
+    <div class="step"><div class="t">T+0:00</div><div class="c"><b>Cyber signal.</b> SIEM timeline lights up: impossible-travel login + new device fingerprint for <code>usr_abc</code>. "A SIEM logs this as a low-priority alert and moves on."</div></div>
+    <div class="step"><div class="t">T+0:40</div><div class="c"><b>Fraud signal.</b> Same user initiates a ₹7,50,000 UPI transfer to a brand-new beneficiary. "A standalone fraud engine sees a large-but-plausible transfer. Borderline. It might let it through."</div></div>
+    <div class="step block"><div class="t block">T+0:41</div><div class="c"><b>Fusion moment → BLOCK.</b> The platform ties the 40-second-old compromise to this transfer. Score jumps to <b>94</b>. Verdict flips to <span style="color:var(--red);font-weight:600">BLOCK</span>. Threat graph auto-expands: the beneficiary shares a device with a 6-account mule cluster.</div></div>
+    <div class="step"><div class="t">T+0:55</div><div class="c"><b>Explain.</b> XAI panel: "Login IP 2,000 km from baseline, 40 s prior; beneficiary shares device with 6 flagged accounts." Counterfactual: "With no prior cyber compromise, score = 61 → CHALLENGE, not BLOCK." <em>That line is the mic-drop.</em></div></div>
+    <div class="step"><div class="t">T+1:10</div><div class="c"><b>Comply.</b> One click → a CERT-In incident report is generated, timestamped inside the 6-hour mandate.</div></div>
+    <div class="step"><div class="t">T+1:25</div><div class="c"><b>Future-proof.</b> Quantum tab: this session negotiated ECDHE — quantum-vulnerable — flagged for Harvest-Now-Decrypt-Later. "No fraud product on the market shows you this."</div></div>
+
+    <div class="callout teal" style="margin-top:22px">
+      <span class="tag">Why this scores</span>
+      <p style="margin:0">In 90 seconds a judge watches you detect a cyber threat, correlate it with a transaction, block fraud in-flight, explain the decision in plain language, auto-file the regulatory report, and surface a quantum risk — <b>every PS2 expected outcome, live.</b> Then you say: "everything you just saw is running; the enterprise architecture behind it is on the next slide."</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= WIN EDGE ================= -->
+<section id="edge">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Win-edge upgrades</h2></div>
+    <p class="sec-sub">Beyond your existing dossier — the additions with the highest ratio of judge-impact to build-time.</p>
+
+    <div class="grid g2">
+      <div class="card"><h4><span class="dot gold"></span>Honest metrics, fusion-uplift headline</h4><p>Retire "99.4% / 62% FP reduction." Lead with a real, reproducible delta: "fusion recovers <b>N%</b> of cyber-preceded frauds our tabular baseline misses, at the same false-positive rate." Bankers trust a defensible number over a suspiciously round one.</p></div>
+      <div class="card"><h4><span class="dot teal"></span>Counterfactual explanations</h4><p>The "if X were Y, we'd have ALLOWED" sentence is the single most memorable XAI element. Cheap to compute, unforgettable in the room.</p></div>
+      <div class="card"><h4><span class="dot amber"></span>CERT-In 6-hour auto-report</h4><p>For a Bank of Maharashtra jury, turning a regulatory burden into a one-click artifact is a direct hit. Half a day of work, outsized payoff.</p></div>
+      <div class="card"><h4><span class="dot green"></span>PS2 coverage checklist slide</h4><p>Put each PS2 expected outcome next to the exact UI element that satisfies it. You make the judges' scoring effortless — and you tick every box on purpose.</p></div>
+      <div class="card"><h4><span class="dot teal"></span>Live latency + TPS counters</h4><p>A visible "&lt;10 ms inline score" and a moving TPS ticker make "real-time" tangible rather than claimed. Judges believe what moves on screen.</p></div>
+      <div class="card"><h4><span class="dot gold"></span>HITL feedback loop</h4><p>A thumbs-up/down on each verdict that nudges the routing/threshold shows product maturity — you closed the analyst loop, not just built a classifier.</p></div>
+    </div>
+
+    <div class="callout gold" style="margin-top:20px">
+      <span class="tag">Positioning line for the deck</span>
+      <p style="margin:0">"Feedzai sees the money. Splunk sees the network. We're the only layer that sees the <em>sentence the attacker is writing across both</em> — and we can prove it, explain it, report it, and we're already watching the quantum clock."</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Q&A ================= -->
+<section id="qa">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Judge Q&amp;A — the four they'll press</h2></div>
+    <p class="sec-sub">Your dossier's Section 27 covers the soft questions. These are the hard ones an industry panel will actually ask. Have the answers reflexive.</p>
+
+    <h3>1 · "You joined cyber and fraud data — but that joined dataset doesn't exist publicly. What did you actually train on?"</h3>
+    <p>"Correct, and that absence <em>is</em> the market gap. We built a controlled evaluation harness: a real transaction backbone (PaySim/IEEE-CIS) with a synthetic cyber-event overlay where compromise events precede a labelled slice of frauds. It lets us prove that when the correlation exists, fusion recovers frauds the silos miss. In production this signal comes from the bank's own SIEM + CBS feeds — exactly what a pilot would wire up."</p>
+
+    <h3>2 · "What's your PR-AUC and false-positive rate at your operating threshold — not accuracy?"</h3>
+    <p>"On a 0.129%-fraud set, accuracy is meaningless — a do-nothing model scores 99.8%. We report PR-AUC, F1, and recall at a fixed low FPR, plus the confusion matrix. Here are the real numbers." <em>(Have the metrics report open.)</em></p>
+
+    <h3>3 · "What's genuinely built versus slideware?"</h3>
+    <p>"Everything in the live demo runs: the fusion engine, the trained models, the graph, the dashboard, the XAI, the quantum monitor, the CERT-In report. Kafka, Flink, Kubernetes and federated learning are our production architecture — on the roadmap, not faked in the prototype. We'd rather show you a real slice than a fake whole."</p>
+
+    <h3>4 · "GraphSAGE in a 50–100 ms payment-authorization window — how?"</h3>
+    <p>"Tiered scoring. LightGBM scores inline in under 10 ms and is never blocked. Graph embeddings are precomputed and refreshed asynchronously — GraphSAGE is inductive, so new accounts get embeddings without retraining the whole graph. The deep traversal informs the score; it doesn't sit in the critical path."</p>
+  </div>
+</section>
+
+<!-- ================= SHIP ================= -->
+<section id="ship">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Ship list &amp; risk register</h2></div>
+
+    <h3>Submission checklist</h3>
+    <ul class="clean">
+      <li>Public GitHub repo — README, architecture diagram, run instructions.</li>
+      <li>3-minute demo video (recorded safety net for the live run).</li>
+      <li>Deck placeholders filled: <b>team name</b>, <b>repo link</b>, <b>demo link</b>, real <b>screenshots</b>.</li>
+      <li>PS2 coverage-checklist slide added.</li>
+      <li>Metrics report (PR-AUC / F1 / confusion matrix) linked in repo + deck.</li>
+      <li>Optional public deploy link (Vercel + Render).</li>
+      <li>Submitted <b>hours before</b> the July 16 cutoff.</li>
+    </ul>
+
+    <h3>Risk register &amp; fallbacks</h3>
+    <table class="tbl">
+      <thead><tr><th>Risk</th><th>Fallback</th></tr></thead>
+      <tbody>
+        <tr><td>Neo4j Aura / GraphSAGE eats a day</td><td class="b">Use <code>networkx</code> centrality features + precomputed Elliptic embeddings; skip live GNN training in the demo.</td></tr>
+        <tr><td>Real-time streaming too fiddly</td><td class="b">WebSocket CSV replay only — no Kafka. It already looks live.</td></tr>
+        <tr><td>Judge challenges the synthetic join</td><td class="b">Lead with the "controlled evaluation harness" framing (Q&amp;A #1). Own it; don't hide it.</td></tr>
+        <tr><td>Over-claimed metrics get exposed</td><td class="b">Fixed on Day 1 by reporting honest numbers. Never quote 99.4%.</td></tr>
+        <tr><td>July 14 MSME collision</td><td class="b">All ML finished by July 13 (built into this sequence). July 14 evening is frontend only.</td></tr>
+        <tr><td>Live demo fails on stage at COEP</td><td class="b">The recorded 3-min video is your parachute. Always have it queued.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout teal" style="margin-top:22px">
+      <span class="tag">The whole plan in one breath</span>
+      <p style="margin:0">Build the fusion overlay today, train honest models by the 13th, ship the single-pane dashboard and the 90-second block-in-flight demo by the 15th, submit early on the 16th — and let the enterprise architecture live in the deck as vision, not as a five-day burden.</p>
+    </div>
+  </div>
+</section>
+
+<div class="footer">
+  <div class="wrap">
+    <p class="mono">FINSPARK'26 · PROBLEM STATEMENT 2 · AI-DRIVEN CYBER↔FRAUD CORRELATION</p>
+    <p>Prototype due 16 Jul 2026 · Mentoring 2 on 13 Jul · Grand Finale at COEP Pune 25–26 Jul. Build the slice, describe the rest, and make Domain Fusion undeniable.</p>
+  </div>
+</div>
+
+<script>
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }});
+  },{threshold:.08});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
