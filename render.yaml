@@ -1,12 +1,12 @@
 services:
   - type: web
     name: risk-engine-api
-    env: docker
+    env: python
     region: ohio
     plan: free
     branch: deploy
-    dockerContext: .
-    dockerfilePath: api/Dockerfile
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PORT
-        value: 8000
+      - key: PYTHON_VERSION
+        value: 3.11.9

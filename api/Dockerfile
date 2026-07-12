@@ -17,8 +17,9 @@ COPY ml/features.py ml/features.py
 COPY ml/predict.py ml/predict.py
 COPY graph/ graph/
 
-# Expose port
+# Expose port (default for local `docker run`; hosts that inject $PORT override it)
 EXPOSE 8000
 
-# Run FastAPI
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run FastAPI — shell form so $PORT (set by Railway/Render at runtime) is honored,
+# falling back to 8000 for local `docker run` with no PORT set.
+CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}
