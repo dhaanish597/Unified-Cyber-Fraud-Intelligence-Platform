@@ -1,0 +1,10 @@
+GraphSAGE on Elliptic Dataset
+AUC: 0.9850
+F1: 0.8665
+Precision: 0.9259
+Recall: 0.8143
+Confusion Matrix:
+[[41723   296]
+ [  844  3701]]
+
+Note: GraphSAGE is inductive — new nodes get embeddings without full retraining (we'll cite this in Q&A).

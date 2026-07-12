@@ -148,3 +148,16 @@ to set the threshold that minimises total expected loss.
 - **Seed**: 42 for all random operations.
 - **Feature columns (baseline)**: `txn_type_enc, log_amount, orig_balance_delta, dest_balance_delta, orig_balance_ratio, dest_balance_ratio, zero_orig_after, zero_dest_before, velocity_1h, velocity_24h, time_since_last_txn`
 - **Feature columns (fusion)**: `txn_type_enc, log_amount, orig_balance_delta, dest_balance_delta, orig_balance_ratio, dest_balance_ratio, zero_orig_after, zero_dest_before, velocity_1h, velocity_24h, time_since_last_txn, cyber_flag`
+
+
+## True Fusion Uplift (Risk Engine)
+
+
+
+## True Fusion Uplift (Risk Engine)
+
+| Metric | Tabular-Only (Engine) | Tabular + Cyber + Graph (Engine) | Δ |
+|---|---|---|---|
+| Recall @0.5% FPR on Cyber-Frauds | 0.9991 | 1.0000 | +0.0009 |
+
+*This metric compares the full Risk Engine (including graph features and anomaly adjustments) with cyber-context enabled vs. disabled, specifically on frauds preceded by a cyber compromise event.*

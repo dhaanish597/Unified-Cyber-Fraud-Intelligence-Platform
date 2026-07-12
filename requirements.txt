@@ -15,8 +15,8 @@ shap==0.46.0
 networkx==3.4.2
 python-louvain==0.16
 neo4j==5.26.0
-torch==2.5.1
-torch_geometric==2.6.1
+torch
+torch_geometric
 
 # --- api ---
 fastapi==0.115.6
