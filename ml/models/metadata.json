@@ -1,0 +1,47 @@
+{
+  "feature_cols_baseline": [
+    "txn_type_enc",
+    "log_amount",
+    "orig_balance_delta",
+    "dest_balance_delta",
+    "orig_balance_ratio",
+    "dest_balance_ratio",
+    "zero_orig_after",
+    "zero_dest_before",
+    "velocity_1h",
+    "velocity_24h",
+    "time_since_last_txn"
+  ],
+  "feature_cols_fusion": [
+    "txn_type_enc",
+    "log_amount",
+    "orig_balance_delta",
+    "dest_balance_delta",
+    "orig_balance_ratio",
+    "dest_balance_ratio",
+    "zero_orig_after",
+    "zero_dest_before",
+    "velocity_1h",
+    "velocity_24h",
+    "time_since_last_txn",
+    "cyber_flag"
+  ],
+  "isolation_forest_cols": [
+    "txn_type_enc",
+    "log_amount",
+    "orig_balance_delta",
+    "dest_balance_delta",
+    "orig_balance_ratio",
+    "dest_balance_ratio",
+    "zero_orig_after",
+    "zero_dest_before",
+    "velocity_1h",
+    "velocity_24h",
+    "time_since_last_txn",
+    "cyber_flag"
+  ],
+  "best_baseline_model": "lgbm_baseline",
+  "best_fusion_model": "lgbm_fusion",
+  "target_fpr": 0.005,
+  "seed": 42
+}
