@@ -152,10 +152,6 @@ to set the threshold that minimises total expected loss.
 
 ## True Fusion Uplift (Risk Engine)
 
-
-
-## True Fusion Uplift (Risk Engine)
-
 | Metric | Tabular-Only (Engine) | Tabular + Cyber + Graph (Engine) | Δ |
 |---|---|---|---|
 | Recall @0.5% FPR on Cyber-Frauds | 0.9991 | 1.0000 | +0.0009 |

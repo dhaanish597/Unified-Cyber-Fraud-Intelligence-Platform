@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: risk-engine-api
+    env: docker
+    region: ohio
+    plan: free
+    dockerContext: .
+    dockerfilePath: api/Dockerfile
+    envVars:
+      - key: PORT
+        value: 8000
