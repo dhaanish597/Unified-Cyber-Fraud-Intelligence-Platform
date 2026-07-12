@@ -8,7 +8,6 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import shap
 
 # PDF Generation
 from reportlab.lib.pagesizes import letter
@@ -63,6 +62,8 @@ class CertInReportRequest(BaseModel):
 
 def get_shap_explanation(txn_dict):
     try:
+        import shap  # lazy: pulls in numba/llvmlite, too slow/heavy to load at server startup
+
         model = _get_fusion_model()
         df = _prepare_single(txn_dict)
         fe = engineer_features(df)
