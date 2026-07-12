@@ -3,6 +3,11 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# libgomp1 provides libgomp.so.1 (GNU OpenMP), required at import time by the
+# compiled lightgbm/xgboost shared libraries. python:3.10-slim doesn't ship it.
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies (trimmed: excludes torch/torch_geometric, which are
 # training-only and never imported at request-serving time — see
 # requirements-render.txt for why. Keeps the image inside Render's free tier.)
