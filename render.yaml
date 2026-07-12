@@ -4,6 +4,7 @@ services:
     env: docker
     region: ohio
     plan: free
+    branch: deploy
     dockerContext: .
     dockerfilePath: api/Dockerfile
     envVars:

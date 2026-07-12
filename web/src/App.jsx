@@ -8,6 +8,9 @@ import Ledger from './components/Ledger';
 import VerdictBadge from './components/VerdictBadge';
 import XAIPanel from './components/XAIPanel';
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const WS_BASE = API_BASE.replace(/^http/, 'ws');
+
 export default function App() {
   const [events, setEvents] = useState([]);
   const [currentTxn, setCurrentTxn] = useState(null);
@@ -20,7 +23,7 @@ export default function App() {
   const ws = useRef(null);
 
   useEffect(() => {
-    fetch('http://localhost:8001/quantum/posture')
+    fetch(`${API_BASE}/quantum/posture`)
       .then(r => r.json())
       .then(data => setQuantumData(data))
       .catch(e => console.error("Quantum fetch error:", e));
@@ -33,7 +36,7 @@ export default function App() {
     setGraphData({ nodes: [], links: [] });
 
     if (ws.current) ws.current.close();
-    ws.current = new WebSocket('ws://localhost:8001/ws/stream');
+    ws.current = new WebSocket(`${WS_BASE}/ws/stream`);
     
     ws.current.onmessage = async (event) => {
       const data = JSON.parse(event.data);
@@ -53,7 +56,7 @@ export default function App() {
       if (data.msg_type === 'transaction') {
         setCurrentTxn(data);
         try {
-          const res = await fetch('http://localhost:8001/evaluate/transaction', {
+          const res = await fetch(`${API_BASE}/evaluate/transaction`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -94,7 +97,7 @@ export default function App() {
   const downloadCertInReport = async () => {
     if (!currentTxn || !evaluation) return;
     
-    const res = await fetch('http://localhost:8001/report/cert-in', {
+    const res = await fetch(`${API_BASE}/report/cert-in`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

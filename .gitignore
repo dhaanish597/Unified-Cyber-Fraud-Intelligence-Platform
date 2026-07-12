@@ -33,6 +33,8 @@ node_modules/
 web/dist/
 web/build/
 .vite/
+.env.local
+.env.*.local
 
 # --- OS / editor ---
 .DS_Store
