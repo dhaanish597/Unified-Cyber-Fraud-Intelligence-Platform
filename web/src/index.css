@@ -1,28 +1,37 @@
+@import './styles/theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  background-color: var(--soc-bg-primary);
+  color: var(--soc-text-primary);
+  font-family: var(--soc-font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0B0F19;
+  background: var(--soc-bg-primary);
 }
 ::-webkit-scrollbar-thumb {
-  background: #2A303C;
-  border-radius: 4px;
+  background: var(--soc-border-default);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3B82F6;
+  background: var(--soc-brand-primary);
+}
+
+/* Monospace Utilities */
+.font-mono-code {
+  font-family: var(--soc-font-mono);
+  letter-spacing: -0.02em;
 }
