@@ -21,6 +21,7 @@ import GraphPage from './pages/GraphPage';
 import SyntheticLabPage from './pages/SyntheticLabPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
 
@@ -52,6 +53,7 @@ export default function App() {
                         <Route path="investigation/:caseId" element={<InvestigationPage />} />
                         <Route path="customers" element={<CustomersPage />} />
                         <Route path="telemetry" element={<TelemetryPage />} />
+                        <Route path="analytics" element={<AnalyticsPage />} />
                         <Route path="banking" element={<BankingPage />} />
                         <Route path="graph" element={<GraphPage />} />
                         <Route path="lab" element={<SyntheticLabPage />} />

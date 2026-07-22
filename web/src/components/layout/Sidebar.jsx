@@ -13,7 +13,8 @@ import {
   Sliders,
   ChevronLeft,
   ChevronRight,
-  Activity
+  Activity,
+  BarChart3
 } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import Tooltip from '../common/Tooltip';
@@ -24,6 +25,7 @@ export default function Sidebar() {
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, shortcut: '⌥1' },
     { to: '/operations', label: 'Operations Center', icon: Activity, badge: 'LIVE' },
+    { to: '/analytics', label: 'Cyber Analytics', icon: BarChart3, badge: 'NEW' },
     { to: '/cases', label: 'Cases Workqueue', icon: Briefcase, badge: '12' },
     { to: '/investigation/CASE-2026-8942', label: 'Investigation Studio', icon: ShieldAlert, highlight: true, shortcut: '⌥3' },
     { to: '/customers', label: 'Customer 360', icon: Users },

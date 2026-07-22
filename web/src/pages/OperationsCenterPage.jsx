@@ -22,7 +22,8 @@ import {
   RefreshCw,
   Upload,
   Terminal,
-  Layers
+  Layers,
+  Landmark
 } from 'lucide-react';
 
 import EnterpriseBadge from '../components/common/EnterpriseBadge';
@@ -53,6 +54,7 @@ export default function OperationsCenterPage() {
   const [selectedCase, setSelectedCase] = useState(null);
   const [quantumData, setQuantumData] = useState(null);
   const [isCSVMapperOpen, setIsCSVMapperOpen] = useState(false);
+  const [websocketStages, setWebsocketStages] = useState([]);
 
   // Engine Metrics State
   const [apiLatency, setApiLatency] = useState(48);
@@ -95,6 +97,14 @@ export default function OperationsCenterPage() {
       try {
         const data = JSON.parse(evt.data);
         if (data.msg_type === 'status') return;
+
+        if (data.msg_type === 'pipeline_overview') {
+          setWebsocketStages([]);
+        }
+
+        if (data.msg_type === 'pipeline_stage') {
+          setWebsocketStages(prev => [...prev, data]);
+        }
 
         if (data.msg_type === 'cyber_event') {
           setCyberEvents(prev => [data, ...prev].slice(0, 50));
@@ -303,11 +313,16 @@ export default function OperationsCenterPage() {
       {/* 3. NARRATIVE AI STORYTELLER */}
       <NarrativeAIStoryteller activeTxn={activeTxnPayload} evaluation={activeCase} />
 
-      {/* 4. SYNCHRONIZED 3-COLUMN OPERATIONAL INSPECTOR VIEW */}
+      {/* 4. REAL-TIME PROCESSING PIPELINE (FULL WIDTH 16-STAGE LIFECYCLE) */}
+      <div className="w-full">
+        <FusionLifecyclePipeline activeTxn={activeTxnPayload} evaluation={activeCase} websocketStages={websocketStages} />
+      </div>
+
+      {/* 5. SYNCHRONIZED OPERATIONAL STREAM PANELS (TRANSACTIONS + CYBER LOGS) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         
-        {/* LEFT COLUMN: INCOMING TRANSACTIONS FEED (4/12) */}
-        <div className="lg:col-span-4 bg-soc-surface border border-soc-border rounded-xl p-4 shadow-lg flex flex-col justify-between h-[480px]">
+        {/* LEFT COLUMN: INCOMING TRANSACTIONS FEED (6/12) */}
+        <div className="lg:col-span-6 bg-soc-surface border border-soc-border rounded-xl p-4 shadow-lg flex flex-col justify-between h-[360px]">
           <div>
             <div className="flex items-center justify-between border-b border-soc-border pb-3 mb-3">
               <h3 className="text-xs font-mono font-bold text-soc-text uppercase tracking-wider flex items-center gap-2">
@@ -319,7 +334,7 @@ export default function OperationsCenterPage() {
               </span>
             </div>
 
-            <div className="overflow-y-auto max-h-[380px] space-y-2 font-mono text-xs pr-1 select-none">
+            <div className="overflow-y-auto max-h-[270px] space-y-2 font-mono text-xs pr-1 select-none">
               {displayCases.map((c) => (
                 <div
                   key={c.id}
@@ -349,13 +364,8 @@ export default function OperationsCenterPage() {
           </div>
         </div>
 
-        {/* CENTER COLUMN: FUSION RUNTIME PIPELINE (4/12) */}
-        <div className="lg:col-span-4 h-[480px]">
-          <FusionLifecyclePipeline activeTxn={activeTxnPayload} evaluation={activeCase} />
-        </div>
-
-        {/* RIGHT COLUMN: CYBER SIEM THREAT LOG STREAM (4/12) */}
-        <div className="lg:col-span-4 bg-soc-surface border border-soc-border rounded-xl p-4 shadow-lg flex flex-col justify-between h-[480px]">
+        {/* RIGHT COLUMN: CYBER SIEM THREAT LOG STREAM (6/12) */}
+        <div className="lg:col-span-6 bg-soc-surface border border-soc-border rounded-xl p-4 shadow-lg flex flex-col justify-between h-[360px]">
           <div>
             <div className="flex items-center justify-between border-b border-soc-border pb-3 mb-3">
               <h3 className="text-xs font-mono font-bold text-soc-text uppercase tracking-wider flex items-center gap-2">
@@ -367,7 +377,7 @@ export default function OperationsCenterPage() {
               </span>
             </div>
 
-            <div className="overflow-y-auto max-h-[380px] space-y-2 font-mono text-xs pr-1">
+            <div className="overflow-y-auto max-h-[270px] space-y-2 font-mono text-xs pr-1">
               {cyberEvents.length === 0 ? (
                 <div className="p-3 rounded-lg border-l-4 border-l-rose-500 bg-rose-500/10 text-rose-400">
                   <div className="font-bold">[T-0:40s] Impossible Travel Login Detected</div>
