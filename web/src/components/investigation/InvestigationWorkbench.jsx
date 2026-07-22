@@ -43,8 +43,14 @@ import SimilarIncidentSearch from '../fabric/SimilarIncidentSearch';
 import AnalystCollaboration from '../fabric/AnalystCollaboration';
 import LearningLoop from '../fabric/LearningLoop';
 import DigitalTwinBaseline from '../fabric/DigitalTwinBaseline';
+import SessionTrustPassportPanel from '../trust/SessionTrustPassportPanel';
+import InvestigationIntelligencePanel from './InvestigationIntelligencePanel';
+import QuantumTrustPanel from '../quantum/QuantumTrustPanel';
+
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+
+
 const WS_BASE = API_BASE.replace(/^http/, 'ws');
 
 export default function InvestigationWorkbench({ caseId = 'CASE-2026-8942' }) {
@@ -237,7 +243,19 @@ export default function InvestigationWorkbench({ caseId = 'CASE-2026-8942' }) {
       {/* 3. DIGITAL TWIN CUSTOMER BASELINE */}
       <DigitalTwinBaseline userId={activeTxnPayload.user_id} />
 
+      {/* 3.5. PRE-TRANSACTION SESSION TRUST PASSPORT */}
+      <SessionTrustPassportPanel sessionId="SESS_9921_CRITICAL" activeTxn={activeTxnPayload} />
+
+      {/* 3.8. INVESTIGATION INTELLIGENCE LAYER */}
+      <InvestigationIntelligencePanel caseId={caseId} activeTxn={activeTxnPayload} />
+
+      {/* 3.9. FUSION QUANTUM TRUST LAYER */}
+      <QuantumTrustPanel />
+
+
       {/* 4. MAIN THREE-PANE OPERATIONAL WORKSPACE */}
+
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         
         {/* LEFT PANEL: CYBER SIEM TELEMETRY (3/12) */}
@@ -295,9 +313,10 @@ export default function InvestigationWorkbench({ caseId = 'CASE-2026-8942' }) {
           <TrustFabric activeTxn={activeTxnPayload} evaluation={activeEvalPayload} />
         </div>
         <div className="lg:col-span-6">
-          <SimilarIncidentSearch activeCase={activeCaseId} />
+          <SimilarIncidentSearch activeCase={caseId} />
         </div>
       </div>
+
 
       {/* 7. COLLABORATION SUITE & MLOPS LEARNING LOOP */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">

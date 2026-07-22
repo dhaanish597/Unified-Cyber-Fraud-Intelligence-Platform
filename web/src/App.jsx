@@ -22,6 +22,8 @@ import SyntheticLabPage from './pages/SyntheticLabPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import DeveloperPlatformPage from './pages/DeveloperPlatformPage';
+
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
 
@@ -59,6 +61,7 @@ export default function App() {
                         <Route path="lab" element={<SyntheticLabPage />} />
                         <Route path="reports" element={<ReportsPage />} />
                         <Route path="settings" element={<SettingsPage />} />
+                        <Route path="developer" element={<DeveloperPlatformPage />} />
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                       </Route>
                     </Routes>

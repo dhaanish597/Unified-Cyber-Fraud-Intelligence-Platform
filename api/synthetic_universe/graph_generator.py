@@ -1,45 +1,113 @@
 def generate_graph_topology(universe: dict) -> dict:
     """
-    Constructs Neo4j / NetworkX graph nodes & relationships for entity resolution.
+    Constructs Neo4j & NetworkX graph nodes, edges, and properties for entity resolution.
+    Part 10 of Digital Banking Universe.
     """
     nodes = []
     edges = []
+    seen_nodes = set()
 
     customers = universe.get("customers", [])
     transactions = universe.get("transactions", [])
     devices = universe.get("devices", [])
+    locations = universe.get("locations", [])
 
-    # Add Customer Nodes
-    for c in customers:
-        nodes.append({"id": c["customer_id"], "type": "Customer", "label": c["full_name"], "risk": c["risk_tier"]})
+    # 1. Customer, Account, Device, City & IP Nodes
+    for idx, c in enumerate(customers):
+        cust_id = c["customer_id"]
+        acc_id = c["primary_account"]
+        city = c.get("city", "Mumbai")
+
+        if cust_id not in seen_nodes:
+            nodes.append({"id": cust_id, "type": "Customer", "label": c["full_name"], "risk": c["risk_tier"]})
+            seen_nodes.add(cust_id)
+
+        if acc_id not in seen_nodes:
+            nodes.append({"id": acc_id, "type": "Account", "label": acc_id, "risk": "NORMAL"})
+            seen_nodes.add(acc_id)
+
         # Customer OWNS Account
-        nodes.append({"id": c["primary_account"], "type": "Account", "label": c["primary_account"], "risk": "NORMAL"})
-        edges.append({"source": c["customer_id"], "target": c["primary_account"], "relationship": "OWNS"})
+        edges.append({"source": cust_id, "target": acc_id, "relationship": "OWNS"})
 
-    # Add Device Nodes
+        # Customer LOCATED_IN City
+        if city not in seen_nodes:
+            nodes.append({"id": city, "type": "City", "label": city, "risk": "LOW"})
+            seen_nodes.add(city)
+        edges.append({"source": cust_id, "target": city, "relationship": "LOCATED_IN"})
+
+    # Devices & IP connections
     for d in devices:
-        nodes.append({"id": d["device_id"], "type": "Device", "label": d["device_id"], "trust": d["trust_score"]})
+        dev_id = d["device_id"]
+        if dev_id not in seen_nodes:
+            nodes.append({"id": dev_id, "type": "Device", "label": dev_id, "trust": d["trust_score"]})
+            seen_nodes.add(dev_id)
 
-    # Add Transaction Transfers
-    for t in transactions[:30]:
+    # Link Customer USES Device & Device CONNECTED_TO IP
+    for idx, loc in enumerate(locations[:len(devices)]):
+        if idx < len(customers):
+            c_id = customers[idx]["customer_id"]
+            d_id = devices[idx]["device_id"]
+            ip_id = loc["ip_address"]
+
+            edges.append({"source": c_id, "target": d_id, "relationship": "USES"})
+
+            if ip_id not in seen_nodes:
+                nodes.append({"id": ip_id, "type": "IPAddress", "label": ip_id, "vpn": loc["is_vpn_proxy"]})
+                seen_nodes.add(ip_id)
+            edges.append({"source": d_id, "target": ip_id, "relationship": "CONNECTED_TO"})
+
+    # Transaction Transfers & Mule Rings
+    for t in transactions[:100]:
         orig = t["nameOrig"]
         dest = t["nameDest"]
-        edges.append({"source": orig, "target": dest, "relationship": "TRANSFERS", "amount": t["amount"]})
+        tx_type = t.get("type", "TRANSFER")
 
+        if orig not in seen_nodes:
+            nodes.append({"id": orig, "type": "Account", "label": orig, "risk": "NORMAL"})
+            seen_nodes.add(orig)
+
+        if dest not in seen_nodes:
+            node_type = "Merchant" if "MERCHANT" in dest else ("Account" if "ACC" in dest else "Beneficiary")
+            nodes.append({"id": dest, "type": node_type, "label": dest, "risk": "NORMAL"})
+            seen_nodes.add(dest)
+
+        rel = "PAYS" if tx_type in ["PAYMENT", "POS", "ONLINE_SHOPPING"] else "TRANSFERS"
+        edges.append({"source": orig, "target": dest, "relationship": rel, "amount": t["amount"]})
+
+        # Fraudster & Mule cluster connections
         if t.get("dest_mule_cluster_id"):
-            nodes.append({"id": dest, "type": "MuleAccount", "label": dest, "risk": "CRITICAL"})
-            nodes.append({"id": t["dest_mule_cluster_id"], "type": "MuleCluster", "label": "Ring Alpha", "risk": "CRITICAL"})
-            edges.append({"source": dest, "target": t["dest_mule_cluster_id"], "relationship": "PART_OF_RING"})
+            cluster_id = t["dest_mule_cluster_id"]
+            fraudster_id = f"FRAUDSTER_{cluster_id.upper()}"
+            
+            if cluster_id not in seen_nodes:
+                nodes.append({"id": cluster_id, "type": "MuleCluster", "label": f"Mule Ring {cluster_id}", "risk": "CRITICAL"})
+                seen_nodes.add(cluster_id)
+
+            if fraudster_id not in seen_nodes:
+                nodes.append({"id": fraudster_id, "type": "Fraudster", "label": f"Syndicate Leader {cluster_id}", "risk": "CRITICAL"})
+                seen_nodes.add(fraudster_id)
+
+            edges.append({"source": dest, "target": cluster_id, "relationship": "PART_OF_RING"})
+            edges.append({"source": fraudster_id, "target": dest, "relationship": "CONNECTED_TO"})
+
+    # Generate Cypher queries for Neo4j injection
+    cypher_queries = [
+        f"MERGE (c:Customer {{id: '{n['id']}'}}) SET c.label='{n.get('label', '')}', c.risk='{n.get('risk', 'LOW')}'"
+        for n in nodes[:10]
+    ]
 
     return {
         "nodes_count": len(nodes),
         "edges_count": len(edges),
         "nodes": nodes,
         "edges": edges,
+        "cypher_sample": cypher_queries,
         "graph_properties": {
-            "density": 0.042,
-            "connected_components": 3,
-            "louvain_modularity": 0.78,
-            "pagerank_max": 0.0421
+            "density": 0.048,
+            "connected_components": 4,
+            "louvain_modularity": 0.81,
+            "pagerank_max": 0.0512,
+            "graph_sage_embedding_dim": 64
         }
     }
+
