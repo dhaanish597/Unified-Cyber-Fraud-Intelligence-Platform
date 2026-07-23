@@ -22,12 +22,12 @@ thing that matters operationally.
 
 | Metric | Value |
 |---|---|
-| **PR-AUC** | **0.9983** |
-| F1 (default threshold) | 0.9685 |
-| Recall @ ≤0.5% FPR | **0.9980** |
-| Actual FPR achieved | 0.5232% |
-| F1 @ fixed FPR threshold | 0.9632 |
-| Score threshold used | 0.4156 |
+| **PR-AUC** | **0.9984** |
+| F1 (default threshold) | 0.9695 |
+| Recall @ ≤0.5% FPR | **0.9988** |
+| Actual FPR achieved | 0.5021% |
+| F1 @ fixed FPR threshold | 0.9649 |
+| Score threshold used | 0.4284 |
 | Test-set size | 60,969 |
 | Test-set fraud count | 4,010 |
 
@@ -35,15 +35,15 @@ thing that matters operationally.
 
 | | Predicted Legit | Predicted Fraud |
 |---|---|---|
-| **Actual Legit** | 56,711 (TN) | 248 (FP) |
-| **Actual Fraud** | 12 (FN) | 3,998 (TP) |
+| **Actual Legit** | 56,714 (TN) | 245 (FP) |
+| **Actual Fraud** | 7 (FN) | 4,003 (TP) |
 
 ### Confusion Matrix (fixed 0.5% FPR threshold)
 
 | | Predicted Legit | Predicted Fraud |
 |---|---|---|
-| **Actual Legit** | 56,661 (TN) | 298 (FP) |
-| **Actual Fraud** | 8 (FN) | 4,002 (TP) |
+| **Actual Legit** | 56,673 (TN) | 286 (FP) |
+| **Actual Fraud** | 5 (FN) | 4,005 (TP) |
 
 ---
 
@@ -61,8 +61,8 @@ thing that matters operationally.
 
 | Metric | Tabular-Only | Tabular + Cyber | Δ |
 |---|---|---|---|
-| PR-AUC | 0.9976 | 0.9983 | +0.0007 |
-| Recall @0.5% FPR | 0.9990 | 0.9980 | -0.001 |
+| PR-AUC | 0.9976 | 0.9984 | +0.0008 |
+| Recall @0.5% FPR | 0.9990 | 0.9988 | -0.0002 |
 
 **Fusion uplift** measures how much adding the `cyber_flag` (whether the originating
 account had a cyber-compromise event within the detection window) improves recall at
@@ -95,29 +95,29 @@ for, the supervised classifiers.
 
 ## Defending Each Number
 
-### PR-AUC = 0.9983
+### PR-AUC = 0.9984
 
 PR-AUC (area under the precision-recall curve) summarises model quality across all
 decision thresholds on the positive class. A random classifier on this dataset would
 score approximately 0.0658 (equal to the fraud rate). Our model
-scores 0.9983, representing a **15.2×
+scores 0.9984, representing a **15.2×
 lift over random**. This is computed on a held-out test set whose steps strictly
 follow all training steps, so there is no temporal leakage. SMOTE synthetic
 over-sampling was applied only to the training split, so the test distribution
 accurately reflects real class proportions.
 
-### Recall @ 0.5% FPR = 0.9980
+### Recall @ 0.5% FPR = 0.9988
 
 In a live bank, the false-positive rate directly maps to how many legitimate customers
 receive a friction event (a challenge, a delayed payment). Setting FPR at 0.5% means
 roughly 5 in every 1,000 legitimate transactions are incorrectly flagged — a
 commercially acceptable level for most retail banks. At this FPR budget, the model
-recovers 99.8% of all actual frauds. The remaining
-0.2% of frauds slip through at this threshold
+recovers 99.9% of all actual frauds. The remaining
+0.1% of frauds slip through at this threshold
 but would be caught by tightening it (at the cost of more false positives). The
 Isolation Forest anomaly score provides a secondary signal for those edge cases.
 
-### F1 = 0.9685
+### F1 = 0.9695
 
 F1 is the harmonic mean of precision and recall at the default 0.5 decision threshold.
 It is reported for completeness and comparability with published benchmarks, but the
@@ -129,8 +129,8 @@ model's calibration is poor, which is not the case here.
 ### Confusion Matrix
 
 The confusion matrices make concrete the trade-off: at the 0.5%-FPR operating point,
-TN=56,661, FP=298,
-FN=8, TP=4,002.
+TN=56,673, FP=286,
+FN=5, TP=4,005.
 Every FN is a fraud that slips through; every FP is a legitimate customer needlessly
 challenged. This matrix lets the fraud operations team calculate direct monetary
 exposure (FN × average fraud amount) and customer-service cost (FP × challenge cost)
@@ -148,12 +148,3 @@ to set the threshold that minimises total expected loss.
 - **Seed**: 42 for all random operations.
 - **Feature columns (baseline)**: `txn_type_enc, log_amount, orig_balance_delta, dest_balance_delta, orig_balance_ratio, dest_balance_ratio, zero_orig_after, zero_dest_before, velocity_1h, velocity_24h, time_since_last_txn`
 - **Feature columns (fusion)**: `txn_type_enc, log_amount, orig_balance_delta, dest_balance_delta, orig_balance_ratio, dest_balance_ratio, zero_orig_after, zero_dest_before, velocity_1h, velocity_24h, time_since_last_txn, cyber_flag`
-
-
-## True Fusion Uplift (Risk Engine)
-
-| Metric | Tabular-Only (Engine) | Tabular + Cyber + Graph (Engine) | Δ |
-|---|---|---|---|
-| Recall @0.5% FPR on Cyber-Frauds | 0.9991 | 1.0000 | +0.0009 |
-
-*This metric compares the full Risk Engine (including graph features and anomaly adjustments) with cyber-context enabled vs. disabled, specifically on frauds preceded by a cyber compromise event.*

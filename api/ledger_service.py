@@ -2,6 +2,9 @@ import json
 import hashlib
 import hmac
 import time
+import os
+import secrets
+import logging
 from datetime import datetime
 
 class LedgerService:
@@ -10,7 +13,13 @@ class LedgerService:
     Implements Hyperledger Fabric architecture for immutable investigation record sealing,
     SHA-256 evidence hashing, digital signatures, and chain of custody verification.
     """
-    def __init__(self, secret_key: str = "FinSpark26_BankOfMaharashtra_QuantumSecretKey"):
+    def __init__(self, secret_key: str = None):
+        if secret_key is None:
+            secret_key = os.environ.get("LEDGER_SECRET")
+            if not secret_key:
+                secret_key = secrets.token_hex(32)
+                logging.warning("LEDGER_SECRET not set. Using generated dev key.")
+        
         self.secret_key = secret_key.encode('utf-8')
         self.current_block_height = 48192
         self.ledger_store = {}
