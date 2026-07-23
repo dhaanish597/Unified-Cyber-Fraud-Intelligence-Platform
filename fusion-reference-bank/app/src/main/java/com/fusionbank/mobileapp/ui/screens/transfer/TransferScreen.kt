@@ -1,6 +1,5 @@
 package com.fusionbank.mobileapp.ui.screens.transfer
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,8 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fusionbank.mobileapp.ui.components.DecisionPipelineDialog
 import com.fusionbank.mobileapp.ui.components.LiveStatusCard
 import com.fusionbank.mobileapp.ui.theme.*
 
@@ -113,7 +112,7 @@ fun TransferScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp), color = TextPrimaryDark, strokeWidth = 2.dp)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("EVALUATING FUSION RISK...")
+                                    Text("EVALUATING FUSION PIPELINE...")
                                 }
                             } else {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -129,51 +128,10 @@ fun TransferScreen(
         }
     }
 
-    // Decision Result Dialog
-    decisionResult?.let { decision ->
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissResult() },
-            containerColor = SurfaceDark,
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val iconColor = when (decision.decision) {
-                        "ALLOW" -> StatusGreen
-                        "REQUIRE_BIOMETRIC", "REQUIRE_OTP", "REQUIRE_FACE_AUTHENTICATION" -> StatusYellow
-                        else -> StatusRed
-                    }
-                    Icon(Icons.Default.Shield, contentDescription = null, tint = iconColor, modifier = Modifier.size(28.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "FUSION DECISION: ${decision.decision}",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = iconColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            text = {
-                Column {
-                    Text("Decision ID: ${decision.decisionId}", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Confidence Score: ${decision.confidence}%", color = TextPrimaryDark, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Recommended Action:", style = MaterialTheme.typography.bodyMedium, color = TextSecondaryDark)
-                    Text(decision.recommendedAction, color = TextPrimaryDark)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Reason Codes:", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-                    decision.reasonCodes.forEach { reason ->
-                        Text("• $reason", style = MaterialTheme.typography.labelSmall, color = AccentCyan)
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.dismissResult() },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
-                ) {
-                    Text("ACKNOWLEDGEMENT")
-                }
-            }
-        )
-    }
+    // Animated Multi-Stage Decision Verification Pipeline Dialog
+    DecisionPipelineDialog(
+        decision = decisionResult,
+        isEvaluating = isEvaluating,
+        onDismiss = { viewModel.dismissResult() }
+    )
 }
