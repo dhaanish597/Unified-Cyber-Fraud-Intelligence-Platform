@@ -1,0 +1,1 @@
+[    5513ms] [ERROR] WebSocket connection to 'wss://risk-engine-api-o2kl.onrender.com/ws/stream' failed: Error during WebSocket handshake: Unexpected response code: 400 @ :2
