@@ -34,6 +34,7 @@ from api.trust_fabric_engine import trust_fabric
 from api.quantum_trust_layer import quantum_trust
 from api.sdk_engine import sdk_engine
 from ml.predict import _get_fusion_model, _prepare_single
+from api.gateway_integration import router as gateway_router
 
 
 
@@ -51,6 +52,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(gateway_router)
 
 class TransactionRequest(BaseModel):
     txn_id: str = "txn_0000"

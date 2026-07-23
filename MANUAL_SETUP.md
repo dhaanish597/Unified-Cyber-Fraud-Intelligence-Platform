@@ -7,3 +7,9 @@
 4. Place the `GeoLite2-City.mmdb` file in the `data/` directory.
 
 If the file is absent, the system will gracefully fall back to a small hardcoded lookup table for demo purposes.
+
+## Payment Gateway Webhook
+1. Create an account on Razorpay or Cashfree (Sandbox mode).
+2. Generate a webhook secret.
+3. Add `GATEWAY_WEBHOOK_SECRET=your_secret` to your `.env` file.
+4. Point the webhook URL to your server (`POST /gateway/webhook`).
