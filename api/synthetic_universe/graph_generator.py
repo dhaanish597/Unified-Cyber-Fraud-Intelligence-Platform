@@ -1,3 +1,5 @@
+import networkx as nx
+
 def generate_graph_topology(universe: dict) -> dict:
     """
     Constructs Neo4j & NetworkX graph nodes, edges, and properties for entity resolution.
@@ -96,18 +98,76 @@ def generate_graph_topology(universe: dict) -> dict:
         for n in nodes[:10]
     ]
 
+    # Compute real networkx metrics
+    G = nx.DiGraph()
+    for n in nodes:
+        G.add_node(n["id"], type=n["type"], label=n.get("label", ""))
+    for e in edges:
+        G.add_edge(e["source"], e["target"], relationship=e["relationship"])
+
+    seed = universe.get("seed", 42)
+
+    graph_properties = {
+        "density": None,
+        "connected_components": None,
+        "louvain_modularity": None,
+        "pagerank_max": None,
+        "graph_sage_embedding_dim": None,
+        "pagerank_distribution": None,
+        "betweenness_centrality": None,
+        "louvain_communities": None,
+        "degree_distribution": None
+    }
+
+    if len(G) > 0:
+        graph_properties["density"] = nx.density(G)
+        
+        # Connected components require undirected graph
+        undirected_G = G.to_undirected()
+        graph_properties["connected_components"] = nx.number_connected_components(undirected_G)
+        
+        try:
+            communities = nx.community.louvain_communities(undirected_G, seed=seed)
+            graph_properties["louvain_communities"] = [list(c) for c in communities]
+            graph_properties["louvain_modularity"] = nx.community.modularity(undirected_G, communities)
+        except Exception as e:
+            graph_properties["louvain_communities"] = None
+            graph_properties["louvain_modularity"] = {"value": None, "reason": str(e)}
+
+        try:
+            pr = nx.pagerank(G)
+            graph_properties["pagerank_max"] = max(pr.values()) if pr else 0.0
+            graph_properties["pagerank_distribution"] = pr
+        except Exception as e:
+            graph_properties["pagerank_max"] = {"value": None, "reason": str(e)}
+            graph_properties["pagerank_distribution"] = None
+
+        try:
+            graph_properties["betweenness_centrality"] = nx.betweenness_centrality(G)
+        except Exception as e:
+            graph_properties["betweenness_centrality"] = None
+
+        try:
+            degrees = [d for n, d in G.degree()]
+            deg_dist = {}
+            for d in degrees:
+                deg_dist[d] = deg_dist.get(d, 0) + 1
+            graph_properties["degree_distribution"] = deg_dist
+        except Exception as e:
+            graph_properties["degree_distribution"] = None
+
+        graph_properties["graph_sage_embedding_dim"] = {"value": None, "reason": "Requires GraphSAGE neural network pass, not computable via pure NetworkX"}
+    else:
+        empty_reason = {"value": None, "reason": "Empty graph"}
+        for k in graph_properties:
+            graph_properties[k] = empty_reason
+
     return {
         "nodes_count": len(nodes),
         "edges_count": len(edges),
         "nodes": nodes,
         "edges": edges,
         "cypher_sample": cypher_queries,
-        "graph_properties": {
-            "density": 0.048,
-            "connected_components": 4,
-            "louvain_modularity": 0.81,
-            "pagerank_max": 0.0512,
-            "graph_sage_embedding_dim": 64
-        }
+        "graph_properties": graph_properties
     }
 
