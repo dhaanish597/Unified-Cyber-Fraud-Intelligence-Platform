@@ -143,8 +143,9 @@ class ResponseOrchestrationEngine:
     Coordinates playbooks, execution workflows, approvals, notifications, and incident conversion.
     """
     def __init__(self):
+        import api.store as store
         self.playbooks: List[dict] = DEFAULT_PLAYBOOKS
-        self.incidents: Dict[str, dict] = {}
+        self.incidents: Dict[str, dict] = {inc["incident_id"]: inc for inc in store.list_all("incidents")}
         self.response_history: List[dict] = []
 
     def recommend_response(self, data: dict) -> dict:
@@ -302,6 +303,8 @@ class ResponseOrchestrationEngine:
         }
 
         self.incidents[incident_id] = incident
+        import api.store as store
+        store.put("incidents", incident_id, incident)
 
         t_total = (time.perf_counter() - t0) * 1000.0
 
@@ -361,6 +364,8 @@ class ResponseOrchestrationEngine:
         incident["owner"] = owner
         incident["status"] = "ASSIGNED_IN_TRIAGE"
         self.incidents[incident_id] = incident
+        import api.store as store
+        store.put("incidents", incident_id, incident)
         return incident
 
     def rollback_response(self, workflow_id: str, reason: str) -> dict:

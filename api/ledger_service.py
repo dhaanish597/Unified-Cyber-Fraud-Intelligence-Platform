@@ -21,8 +21,15 @@ class LedgerService:
                 logging.warning("LEDGER_SECRET not set. Using generated dev key.")
         
         self.secret_key = secret_key.encode('utf-8')
-        self.current_block_height = 48192
-        self.ledger_store = {}
+        import api.store as store
+        saved_block = store.get("metadata", "current_block_height")
+        if saved_block is not None:
+            self.current_block_height = saved_block.get("value", 48192)
+        else:
+            self.current_block_height = 48192
+            
+        saved_records = store.list_all("ledger_records")
+        self.ledger_store = {rec["evidence_id"]: rec for rec in saved_records}
 
     def _canonical_json(self, data: dict) -> str:
         """Converts dict to canonical, deterministic JSON string sorted by keys."""
@@ -44,6 +51,8 @@ class LedgerService:
         
         self.current_block_height += 1
         block_height = self.current_block_height
+        import api.store as store
+        store.put("metadata", "current_block_height", {"value": block_height})
         tx_hash = f"0x{hashlib.sha256(f'{sha256_hash}:{block_height}'.encode()).hexdigest()[:64]}"
         verification_token = f"VERIF-FABRIC-2026-{sha256_hash[:12].upper()}"
 
@@ -80,6 +89,7 @@ class LedgerService:
         }
 
         self.ledger_store[evidence_id] = record
+        store.put("ledger_records", evidence_id, record)
         return record
 
     def verify_evidence(self, evidence_id: str, expected_hash: str = None) -> dict:

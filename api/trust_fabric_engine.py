@@ -12,8 +12,9 @@ class TrustFabricEngine:
     Chain of Custody, Digital Signatures, Investigation Trust Index, and Audit Timelines.
     """
     def __init__(self):
-        self.evidence_store: Dict[str, dict] = {}
-        self.chain_of_custody_logs: Dict[str, List[dict]] = {}
+        import api.store as store
+        self.evidence_store: Dict[str, dict] = {e["evidence_id"]: e for e in store.list_all("evidence")}
+        self.chain_of_custody_logs: Dict[str, List[dict]] = {l["evidence_id"]: l["logs"] for l in store.list_all("custody_logs")}
 
     def create_evidence_package(self, data: dict) -> dict:
         """
@@ -149,6 +150,10 @@ class TrustFabricEngine:
         self.evidence_store[evidence_id] = evidence_package
         self.chain_of_custody_logs[evidence_id] = initial_custody_log
 
+        import api.store as store
+        store.put("evidence", evidence_id, evidence_package)
+        store.put("custody_logs", evidence_id, {"evidence_id": evidence_id, "logs": initial_custody_log})
+
         return evidence_package
 
     def get_evidence(self, evidence_id: str) -> dict:
@@ -176,6 +181,8 @@ class TrustFabricEngine:
                 "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S IST"),
                 "reason": "Regulator integrity check performed."
             })
+            import api.store as store
+            store.put("custody_logs", evidence_id, {"evidence_id": evidence_id, "logs": self.chain_of_custody_logs[evidence_id]})
 
         return {
             "evidence_id": evidence_id,
