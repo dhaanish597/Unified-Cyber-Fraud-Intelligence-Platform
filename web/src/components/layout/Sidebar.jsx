@@ -31,6 +31,7 @@ export default function Sidebar() {
       id: 'intel',
       title: 'Fraud Intelligence',
       items: [
+        { to: '/threats', label: 'Threat Intelligence', icon: ShieldAlert, badge: 'NEW', highlight: true },
         { to: '/analytics', label: 'Cyber Analytics', icon: BarChart3 },
         { to: '/cases', label: 'Cases Workqueue', icon: Briefcase, badge: '12' },
         { to: '/customers', label: 'Customer Digital Twin', icon: Users }
