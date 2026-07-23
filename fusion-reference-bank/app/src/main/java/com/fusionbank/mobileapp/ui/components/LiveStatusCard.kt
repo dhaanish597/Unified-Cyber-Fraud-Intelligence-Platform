@@ -1,20 +1,21 @@
 package com.fusionbank.mobileapp.ui.components
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -25,12 +26,16 @@ import com.fusionbank.mobileapp.ui.theme.*
 
 @Composable
 fun LiveStatusCard(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenSimulator: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val connectionState by Fusion.connectionState.collectAsState()
     val activeSession by Fusion.activeSession.collectAsState()
     val trustPassport by Fusion.trustPassport.collectAsState()
     val latencyMs by Fusion.sdkLatencyMs.collectAsState()
+
+    var logoTapCount by remember { mutableStateOf(0) }
 
     val (statusColor, statusText) = when (connectionState) {
         FusionConnectionState.CONNECTED -> StatusGreen to "CONNECTED"
@@ -61,7 +66,17 @@ fun LiveStatusCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        logoTapCount++
+                        if (logoTapCount >= 7) {
+                            logoTapCount = 0
+                            Toast.makeText(context, "Fusion Demo Mode Enabled", Toast.LENGTH_SHORT).show()
+                            onOpenSimulator?.invoke()
+                        }
+                    }
+                ) {
                     Icon(
                         imageVector = Icons.Default.Shield,
                         contentDescription = "Fusion Shield",

@@ -12,6 +12,7 @@ import com.fusionbank.mobileapp.ui.screens.dashboard.DashboardScreen
 import com.fusionbank.mobileapp.ui.screens.login.LoginScreen
 import com.fusionbank.mobileapp.ui.screens.profile.ProfileScreen
 import com.fusionbank.mobileapp.ui.screens.qr.QrPaymentScreen
+import com.fusionbank.mobileapp.ui.screens.simulator.SimulatorScreen
 import com.fusionbank.mobileapp.ui.screens.splash.SplashScreen
 import com.fusionbank.mobileapp.ui.screens.transfer.TransferScreen
 
@@ -25,6 +26,7 @@ object Destinations {
     const val QR_PAYMENT = "qr_payment"
     const val BILL_PAYMENT = "bill_payment"
     const val PROFILE = "profile"
+    const val SIMULATOR = "simulator"
 }
 
 @Composable
@@ -98,7 +100,16 @@ fun NavGraph(
                     navController.navigate(Destinations.LOGIN) {
                         popUpTo(Destinations.DASHBOARD) { inclusive = true }
                     }
+                },
+                onOpenSimulator = {
+                    navController.navigate(Destinations.SIMULATOR)
                 }
+            )
+        }
+
+        composable(Destinations.SIMULATOR) {
+            SimulatorScreen(
+                onBack = { navController.popBackStack() }
             )
         }
     }
