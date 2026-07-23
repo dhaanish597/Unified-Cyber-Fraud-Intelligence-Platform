@@ -24,7 +24,7 @@ uvicorn[standard]==0.32.1
 websockets==14.1
 python-dotenv==1.0.1
 pydantic==2.10.3
-
+geoip2
 # --- reporting ---
 reportlab==4.2.5
 

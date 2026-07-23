@@ -259,7 +259,7 @@ class SessionTrustPassportEngine:
         
         ip = data.get("ip", "185.15.2.22")
         city = data.get("city")
-        curr_geo = get_coordinates(city if city else ip)
+        curr_geo = get_coordinates(ip if ip else city)
         
         twin = get_or_create_digital_twin(user_id)
         home_geo = get_coordinates(twin.locations.get("home_location", {}).get("city", "Mumbai"))
@@ -269,7 +269,9 @@ class SessionTrustPassportEngine:
             history_sorted = sorted(history, key=lambda x: _parse_time(x.get("timestamp", "2000-01-01 00:00:00")))
             last_travel = history_sorted[-1]
             prev_ts = last_travel.get("timestamp")
-            prev_geo = get_coordinates(last_travel.get("city", "Mumbai"))
+            prev_ip = last_travel.get("ip")
+            prev_city = last_travel.get("city", "Mumbai")
+            prev_geo = get_coordinates(prev_ip if prev_ip else prev_city)
         else:
             prev_ts = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
             prev_geo = home_geo
