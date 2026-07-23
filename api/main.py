@@ -33,6 +33,7 @@ from api.response_orchestrator_engine import soar_engine
 from api.trust_fabric_engine import trust_fabric
 from api.quantum_trust_layer import quantum_trust
 from api.sdk_engine import sdk_engine
+from api.cyber_threat_engine import cyber_threat_engine
 from ml.predict import _get_fusion_model, _prepare_single
 from api.gateway_integration import router as gateway_router
 
@@ -838,11 +839,19 @@ async def sdk_register_network(req: SDKNetworkRequest):
 
 @app.post("/sdk/event")
 async def sdk_ingest_event(req: SDKEventRequest):
-    return sdk_engine.ingest_event(req.dict())
+    event_dict = req.dict()
+    res = sdk_engine.ingest_event(event_dict)
+    # Evaluate Cyber Threat Engine (<100ms)
+    cyber_threat_engine.evaluate_event(event_dict)
+    return res
 
 @app.post("/sdk/request-decision")
 async def sdk_request_decision(req: SDKDecisionRequest):
-    return sdk_engine.request_decision(req.dict())
+    dec_dict = req.dict()
+    res = sdk_engine.request_decision(dec_dict)
+    # Evaluate Cyber Threat Engine (<100ms)
+    cyber_threat_engine.evaluate_event(dec_dict)
+    return res
 
 @app.get("/sdk/policies")
 async def sdk_get_policies():
@@ -912,6 +921,37 @@ async def get_metrics_cost(fn_cost: float = 250000.0, fp_cost: float = 400.0):
         return recomputed
     except Exception as e:
         return {"error": str(e)}
+
+# --- ENTERPRISE CYBER THREAT INTELLIGENCE ENGINE ENDPOINTS (PHASE 2) ---
+@app.get("/threats")
+async def get_threats(status: str = None, category: str = None, severity: str = None):
+    return {"threats": cyber_threat_engine.get_all_threats(status=status, category=category, severity=severity)}
+
+@app.get("/threats/{threat_id}")
+async def get_threat_by_id(threat_id: str):
+    t = cyber_threat_engine.get_threat_by_id(threat_id)
+    if not t:
+        return {"error": "Threat not found", "threat_id": threat_id}
+    return t
+
+@app.get("/threats/session/{session_id}")
+async def get_threats_by_session(session_id: str):
+    return {"session_id": session_id, "threats": cyber_threat_engine.get_threats_by_session(session_id)}
+
+@app.get("/threats/device/{device_id}")
+async def get_threats_by_device(device_id: str):
+    return {"device_id": device_id, "threats": cyber_threat_engine.get_threats_by_device(device_id)}
+
+@app.post("/threats/evaluate")
+async def evaluate_threat_event(event: dict):
+    threats = cyber_threat_engine.evaluate_event(event)
+    return {"status": "SUCCESS", "evaluated_threats": threats, "count": len(threats)}
+
+@app.post("/threats/simulate")
+async def simulate_threat_scenario(payload: dict):
+    threats = cyber_threat_engine.evaluate_event(payload)
+    return {"status": "SIMULATED", "threats": threats}
+
 
 if __name__ == "__main__":
     import uvicorn
