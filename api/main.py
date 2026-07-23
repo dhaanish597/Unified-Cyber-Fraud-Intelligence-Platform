@@ -865,6 +865,21 @@ async def sdk_get_live_events():
 async def sdk_get_error_codes():
     return sdk_engine.get_error_codes()
 
+@app.get("/metrics/evaluate")
+async def get_metrics_evaluate():
+    import json
+    import datetime
+    report_path = ROOT / "ml" / "metrics_report.md"
+    try:
+        content = report_path.read_text()
+        json_str = content.split("```json")[1].split("```")[0].strip()
+        data = json.loads(json_str)
+        mtime = report_path.stat().st_mtime
+        data["computed_at"] = datetime.datetime.fromtimestamp(mtime).isoformat()
+        return data
+    except Exception as e:
+        return {"error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api.main:app", host="0.0.0.0", port=8001, reload=True)
