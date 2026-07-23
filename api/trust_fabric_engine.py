@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import json
 import random
+import uuid
 from typing import Dict, List, Any
 
 class TrustFabricEngine:
@@ -21,13 +22,13 @@ class TrustFabricEngine:
         Module 1 & 2 & 4 & 5: Generates evidence package, calculates SHA-256 hash, signs digitally, computes Trust Index.
         """
         t0 = time.perf_counter()
-        incident_id = data.get("incident_id", f"INC-2026-{random.randint(1000, 9999)}")
+        incident_id = data.get("incident_id", f"INC-2026-{str(uuid.uuid4())[:8]}")
         case_id = data.get("case_id", "CASE-2026-8942")
         session_id = data.get("session_id", "SESS_9921_CRITICAL")
         user_id = data.get("user_id", "usr_abc")
         amount = float(data.get("amount", 750000.0))
 
-        evidence_id = f"EVID_{case_id}_{random.randint(1000, 9999)}"
+        evidence_id = f"EVID_{case_id}_{str(uuid.uuid4())[:8]}"
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")
 
         # Module 1 Evidence Payload
@@ -107,15 +108,16 @@ class TrustFabricEngine:
         }
 
         # Module 7 Complete Audit Timeline
+        base_time = datetime.datetime.now()
         audit_timeline = [
-            {"step": 1, "timestamp": "2026-07-22 21:50:00 IST", "event": "Authentication Request & Session Init", "status": "COMPLETED", "actor": "System"},
-            {"step": 2, "timestamp": "2026-07-22 21:50:01 IST", "event": "Threat Correlation Engine Triggered", "status": "COMPLETED", "actor": "Pre-Tx Security Layer"},
-            {"step": 3, "timestamp": "2026-07-22 21:50:02 IST", "event": "Pre-Tx Decision Verdict Generated (BLOCK)", "status": "COMPLETED", "actor": "Fusion Decision Engine"},
-            {"step": 4, "timestamp": "2026-07-22 21:50:03 IST", "event": "Account & Mule Beneficiary Frozen", "status": "EXECUTED", "actor": "SOAR Response Orchestrator"},
-            {"step": 5, "timestamp": "2026-07-22 21:50:04 IST", "event": "Evidence Package Assembled", "status": "GENERATED", "actor": "Trust Fabric Engine"},
-            {"step": 6, "timestamp": "2026-07-22 21:50:05 IST", "event": "SHA-256 Hash Computed & Cryptographically Sealed", "status": "SEALED", "actor": "Cryptographic Hash Service"},
-            {"step": 7, "timestamp": "2026-07-22 21:50:06 IST", "event": "HSM Node Digital Signature Applied", "status": "SIGNED", "actor": "HSM Key Node 01"},
-            {"step": 8, "timestamp": "2026-07-22 21:50:07 IST", "event": "Chain of Custody Log Opened", "status": "AUDITED", "actor": "Analyst_04 (Tier-3)"}
+            {"step": 1, "timestamp": (base_time + datetime.timedelta(seconds=0)).strftime("%Y-%m-%d %H:%M:%S IST"), "event": "Authentication Request & Session Init", "status": "COMPLETED", "actor": "System"},
+            {"step": 2, "timestamp": (base_time + datetime.timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S IST"), "event": "Threat Correlation Engine Triggered", "status": "COMPLETED", "actor": "Pre-Tx Security Layer"},
+            {"step": 3, "timestamp": (base_time + datetime.timedelta(seconds=2)).strftime("%Y-%m-%d %H:%M:%S IST"), "event": "Pre-Tx Decision Verdict Generated (BLOCK)", "status": "COMPLETED", "actor": "Fusion Decision Engine"},
+            {"step": 4, "timestamp": (base_time + datetime.timedelta(seconds=3)).strftime("%Y-%m-%d %H:%M:%S IST"), "event": "Account & Mule Beneficiary Frozen", "status": "EXECUTED", "actor": "SOAR Response Orchestrator"},
+            {"step": 5, "timestamp": (base_time + datetime.timedelta(seconds=4)).strftime("%Y-%m-%d %H:%M:%S IST"), "event": "Evidence Package Assembled", "status": "GENERATED", "actor": "Trust Fabric Engine"},
+            {"step": 6, "timestamp": (base_time + datetime.timedelta(seconds=5)).strftime("%Y-%m-%d %H:%M:%S IST"), "event": "SHA-256 Hash Computed & Cryptographically Sealed", "status": "SEALED", "actor": "Cryptographic Hash Service"},
+            {"step": 7, "timestamp": (base_time + datetime.timedelta(seconds=6)).strftime("%Y-%m-%d %H:%M:%S IST"), "event": "HSM Node Digital Signature Applied", "status": "SIGNED", "actor": "HSM Key Node 01"},
+            {"step": 8, "timestamp": (base_time + datetime.timedelta(seconds=7)).strftime("%Y-%m-%d %H:%M:%S IST"), "event": "Chain of Custody Log Opened", "status": "AUDITED", "actor": "Analyst_04 (Tier-3)"}
         ]
 
         evidence_package = {

@@ -1,5 +1,4 @@
-import json
-import math
+
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -194,17 +193,21 @@ def compute_investigation_trust(txn: dict, eval_res: dict = None) -> dict:
     ledger_record = ledger_service.create_evidence_record(raw_evidence_pkg)
 
     # 9. Performance & Data Provenance Telemetry
-    telemetry = {
-        "tps_capacity": 1450,
-        "inference_ms": 12,
-        "neo4j_lookup_ms": 8,
-        "feature_eng_ms": 4,
-        "shap_explain_ms": 18,
-        "ledger_commit_ms": 6,
-        "total_latency_ms": 48,
-        "queue_depth": 2,
-        "success_rate_percent": 99.98
-    }
+    timings = txn.get("_timings", {})
+    telemetry = {}
+    
+    if "inference_ms" in timings:
+        telemetry["inference_ms"] = round(timings["inference_ms"], 1)
+    if "neo4j_lookup_ms" in timings:
+        telemetry["neo4j_lookup_ms"] = round(timings["neo4j_lookup_ms"], 1)
+    if "feature_eng_ms" in timings:
+        telemetry["feature_eng_ms"] = round(timings["feature_eng_ms"], 1)
+    if "shap_explain_ms" in timings:
+        telemetry["shap_explain_ms"] = round(timings["shap_explain_ms"], 1)
+    if "ledger_commit_ms" in timings:
+        telemetry["ledger_commit_ms"] = round(timings["ledger_commit_ms"], 1)
+    if "total_latency_ms" in timings:
+        telemetry["total_latency_ms"] = round(timings["total_latency_ms"], 1)
 
     provenance = {
         "input_dataset": "PaySim / Synthetic Cyber-Overlay",

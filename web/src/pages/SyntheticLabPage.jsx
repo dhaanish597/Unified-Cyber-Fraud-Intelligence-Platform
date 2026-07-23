@@ -1,21 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  FlaskConical, 
-  Play, 
-  Download, 
-  Sliders, 
-  ShieldAlert, 
-  CheckCircle2, 
-  RefreshCw, 
-  Database, 
-  Users, 
-  CreditCard, 
-  Smartphone, 
-  Share2, 
-  Loader2,
-  FileCode,
-  FileSpreadsheet
-} from 'lucide-react';
+import { FlaskConical, Play, Database, Loader2, FileCode, FileSpreadsheet } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
 

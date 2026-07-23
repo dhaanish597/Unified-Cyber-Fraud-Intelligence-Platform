@@ -344,20 +344,8 @@ class ResponseOrchestrationEngine:
     def get_incident(self, incident_id: str) -> dict:
         if incident_id in self.incidents:
             return self.incidents[incident_id]
-        # Return default incident for demo
-        return {
-            "incident_id": incident_id,
-            "case_id": "CASE-2026-8942",
-            "severity": "CRITICAL",
-            "priority": "P1",
-            "owner": "Analyst_04 (Tier-3)",
-            "status": "OPEN_INVESTIGATION",
-            "loss_prevented": "INR 7,50,000.00",
-            "threat_narrative": "Impossible Travel Account Takeover & Mule Ring Layering",
-            "related_customers": ["usr_abc"],
-            "related_devices": ["dev_9999"],
-            "related_sessions": ["SESS_9921_CRITICAL"]
-        }
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Incident not found")
 
     def assign_incident(self, incident_id: str, owner: str) -> dict:
         incident = self.get_incident(incident_id)

@@ -1,24 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ShieldAlert, 
-  Briefcase, 
-  Users, 
-  Radio, 
-  Landmark, 
-  Share2, 
-  FlaskConical, 
-  FileCheck2, 
-  Sliders,
-  ChevronLeft,
-  ChevronRight,
-  Activity,
-  BarChart3,
-  ChevronDown,
-  Layers,
-  Code2
-} from 'lucide-react';
+import { LayoutDashboard, ShieldAlert, Briefcase, Users, Radio, Landmark, Share2, FlaskConical, FileCheck2, Sliders, ChevronLeft, ChevronRight, Activity, BarChart3, ChevronDown, Code2 } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import Tooltip from '../common/Tooltip';
 

@@ -1,6 +1,5 @@
 import datetime
-import math
-import hashlib
+
 from typing import Dict, List, Any
 
 class CustomerDigitalTwin:

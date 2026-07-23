@@ -1,34 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ShieldAlert, 
-  Activity, 
-  DollarSign, 
-  Cpu, 
-  ArrowUpRight, 
-  CheckCircle2, 
-  AlertTriangle, 
-  FileText, 
-  Radio, 
-  Server, 
-  Zap, 
-  Sparkles, 
-  Search, 
-  Filter, 
-  Lock, 
-  Clock, 
-  UserCheck, 
-  TrendingUp, 
-  RefreshCw,
-  Upload,
-  Terminal,
-  Layers,
-  Landmark,
-  User,
-  Smartphone,
-  ChevronDown,
-  ChevronUp
-} from 'lucide-react';
+import { ShieldAlert, Radio, RefreshCw, Upload, Terminal, Landmark, User, ChevronDown, ChevronUp } from 'lucide-react';
 
 import EnterpriseBadge from '../components/common/EnterpriseBadge';
 import StatusBadge from '../components/common/StatusBadge';

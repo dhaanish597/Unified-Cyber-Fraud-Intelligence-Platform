@@ -1,21 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Lock, 
-  ShieldCheck, 
-  CheckCircle2, 
-  FileText, 
-  Cpu, 
-  Key, 
-  RefreshCw,
-  Award,
-  Download,
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
-  UserCheck,
-  Globe,
-  Share2
-} from 'lucide-react';
+import { Lock, ShieldCheck, CheckCircle2, FileText, Key, RefreshCw, Award, Download } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
 

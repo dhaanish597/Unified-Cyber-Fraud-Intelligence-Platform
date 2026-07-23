@@ -20,12 +20,12 @@ if str(ROOT) not in sys.path:
 
 from api.risk_engine import evaluate
 from api.pipeline_engine import execute_pipeline
-from api.trust_engine import compute_investigation_trust
+from api.pipeline_engine import execute_pipeline
 from api.scenario_engine import get_all_scenarios_list, generate_scenario
 from api.synthetic_universe.fraud_scenario_engine import generate_bank_universe
 from api.synthetic_universe.graph_generator import generate_graph_topology
 from api.synthetic_universe.exporter import export_dataset_csv, export_dataset_json, export_dataset_replay, export_dataset_parquet_bytes
-from api.synthetic_universe.bank_model import default_bank, get_virtual_bank, BANK_REGISTRY
+from api.synthetic_universe.bank_model import get_virtual_bank, BANK_REGISTRY
 from api.digital_twin_engine import get_or_create_digital_twin
 from api.session_intelligence_engine import session_engine
 from api.investigation_intelligence_engine import investigation_engine

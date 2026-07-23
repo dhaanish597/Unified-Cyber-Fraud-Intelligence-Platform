@@ -1,24 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  User, 
-  Shield, 
-  MapPin, 
-  DollarSign, 
-  Clock, 
-  Activity, 
-  Smartphone, 
-  Globe, 
-  TrendingUp, 
-  Layers, 
-  GitCommit, 
-  Sparkles, 
-  AlertTriangle, 
-  CheckCircle2, 
-  ArrowUpRight, 
-  RefreshCw, 
-  ChevronRight,
-  Gauge
-} from 'lucide-react';
+import { User, DollarSign, Clock, Smartphone, Globe, Layers, GitCommit, Sparkles, AlertTriangle, CheckCircle2, RefreshCw, Gauge } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
 

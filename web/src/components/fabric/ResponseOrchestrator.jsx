@@ -1,26 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Play, 
-  CheckCircle2, 
-  Lock, 
-  ShieldAlert, 
-  Zap, 
-  Send, 
-  Bell, 
-  FileText, 
-  Cpu, 
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-  RotateCcw,
-  AlertTriangle,
-  UserCheck,
-  Smartphone,
-  Globe,
-  Radio,
-  ExternalLink
-} from 'lucide-react';
+import { Play, CheckCircle2, ShieldAlert, Zap, FileText, ChevronDown, ChevronUp, RefreshCw, RotateCcw } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
 

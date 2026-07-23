@@ -127,7 +127,10 @@ SCENARIOS = {
 
 def generate_scenario(scenario_id: str) -> dict:
     """Returns scenario configuration and generated payload."""
-    scenario = SCENARIOS.get(scenario_id, SCENARIOS["account_takeover"])
+    if scenario_id not in SCENARIOS:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Scenario not found")
+    scenario = SCENARIOS[scenario_id]
     return {
         "scenario_id": scenario["id"],
         "title": scenario["title"],

@@ -92,7 +92,7 @@ def generate_graph_topology(universe: dict) -> dict:
 
     # Generate Cypher queries for Neo4j injection
     cypher_queries = [
-        f"MERGE (c:Customer {{id: '{n['id']}'}}) SET c.label='{n.get('label', '')}', c.risk='{n.get('risk', 'LOW')}'"
+        f"MERGE (c:{n['type']} {{id: '{n['id']}'}}) SET c.label='{n.get('label', '')}', c.risk='{n.get('risk', 'LOW')}'"
         for n in nodes[:10]
     ]
 

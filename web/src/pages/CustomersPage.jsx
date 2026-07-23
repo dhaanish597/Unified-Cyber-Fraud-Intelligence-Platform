@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Users, Search, ArrowUpRight, ShieldAlert, X, Filter, RotateCcw, CheckCircle2, AlertTriangle, Shield, Smartphone, Globe, Landmark } from 'lucide-react';
+import { Users, Search, ArrowUpRight, X, Filter, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function CustomersPage() {

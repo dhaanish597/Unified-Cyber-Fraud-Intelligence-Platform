@@ -55,55 +55,46 @@ def execute_pipeline(txn: dict) -> dict:
     device_id = txn.get("device_id") or "dev_9999"
     has_cyber = txn.get("cyber_compromise_in_window", True)
     mule_cluster = txn.get("dest_mule_cluster_id") or ("cluster_alpha" if dest == "ACC_MULE_NEW" else None)
+    txn["txn_id"] = txn_id
+    txn["timestamp"] = timestamp
+    txn["amount"] = amount
+    txn["user_id"] = user_id
+    txn["nameOrig"] = orig
+    txn["nameDest"] = dest
+    txn["ip"] = ip
+    txn["device_id"] = device_id
+    txn["cyber_compromise_in_window"] = has_cyber
+    txn["dest_mule_cluster_id"] = mule_cluster
 
-    is_demo_txn = (amount == 750000.0 and user_id == "usr_abc") or txn.get("is_demo", False)
 
-    # Calculate model scores
-    if is_demo_txn:
-        lgbm_prob = 0.87
-        iso_score_raw = -0.24
-        iso_score_norm = 0.94
-        composite_score = 94.0
-        action = "BLOCK"
-        reasons = [
-            "High baseline fraud probability (Tabular Score: 0.87)",
-            "Recent cyber compromise detected (Impossible travel login 40s prior)",
-            "Beneficiary is part of a known mule cluster (cluster_alpha)"
-        ]
-        shap_values = [
-            {"feature": "cyber_compromise_flag", "impact": +2.1, "interpretation": "High risk cyber login preceding transfer"},
-            {"feature": "log_amount", "impact": +1.2, "interpretation": "Large transaction amount relative to balance"},
-            {"feature": "dest_mule_cluster_risk", "impact": +0.8, "interpretation": "Destination account associated with mule ring"},
-            {"feature": "time_since_last_txn", "impact": -0.4, "interpretation": "Recent activity window"}
-        ]
-        pagerank = 0.0421
-    else:
-        # Live calculation
-        eval_res = evaluate(txn)
-        composite_score = float(eval_res.get("score", 65.0))
-        action = eval_res.get("action", "CHALLENGE")
-        reasons = eval_res.get("reasons", [])
-        
-        tab_p = tabular_score(txn, use_fusion=True)
-        lgbm_prob = round(float(tab_p), 2)
-        
-        iso_raw = anomaly_score(txn)
-        iso_score_raw = round(float(iso_raw), 2)
-        iso_score_norm = round(min(0.99, max(0.10, abs(iso_score_raw) * 2.5)), 2)
-        
-        orig_feat = GRAPH_FEATURES.get(orig, {})
-        pagerank = round(orig_feat.get("pagerank", 0.015), 4)
-        
-        shap_values = [
-            {"feature": "amount_ratio", "impact": 1.1},
-            {"feature": "cyber_flag", "impact": 1.8 if has_cyber else 0.0},
-            {"feature": "dest_centrality", "impact": 0.6 if mule_cluster else 0.1}
-        ]
-
+    # Live calculation
+    eval_res = evaluate(txn)
+    composite_score = float(eval_res.get("score", 65.0))
+    action = eval_res.get("action", "CHALLENGE")
+    reasons = eval_res.get("reasons", [])
+    
+    tab_p = tabular_score(txn, use_fusion=True)
+    lgbm_prob = round(float(tab_p), 2)
+    
+    iso_raw = anomaly_score(txn)
+    iso_score_raw = round(float(iso_raw), 2)
+    iso_score_norm = round(min(0.99, max(0.10, abs(iso_score_raw) * 2.5)), 2)
+    
+    orig_feat = GRAPH_FEATURES.get(orig, {})
+    pagerank = round(orig_feat.get("pagerank", 0.015), 4)
+    
+    shap_values = [
+        {"feature": "amount_ratio", "impact": 1.1},
+        {"feature": "cyber_flag", "impact": 1.8 if has_cyber else 0.0},
+        {"feature": "dest_centrality", "impact": 0.6 if mule_cluster else 0.1}
+    ]
     stages_executed = []
+    _timings = {}
+    _t_start_total = time.perf_counter()
 
     # 1. Incoming Transaction
-    stages_executed.append({
+    _t0_1 = time.perf_counter()
+    _stage_dict_1 = {
         "stage_id": "stage_1_incoming",
         "stage_index": 1,
         "name": "Incoming Transaction",
@@ -121,10 +112,16 @@ def execute_pipeline(txn: dict) -> dict:
             "destination": dest,
             "raw_payload": txn
         }
-    })
+    }
+    _t1_1 = time.perf_counter()
+    _dur_1 = (_t1_1 - _t0_1) * 1000
+    _timings["stage_1"] = _dur_1
+    _stage_dict_1["timing_ms"] = round(_dur_1, 2)
+    stages_executed.append(_stage_dict_1)
 
     # 2. Validation
-    stages_executed.append({
+    _t0_2 = time.perf_counter()
+    _stage_dict_2 = {
         "stage_id": "stage_2_validation",
         "stage_index": 2,
         "name": "Validation",
@@ -139,10 +136,16 @@ def execute_pipeline(txn: dict) -> dict:
             "timestamp_valid": True,
             "amount_positive": amount > 0
         }
-    })
+    }
+    _t1_2 = time.perf_counter()
+    _dur_2 = (_t1_2 - _t0_2) * 1000
+    _timings["stage_2"] = _dur_2
+    _stage_dict_2["timing_ms"] = round(_dur_2, 2)
+    stages_executed.append(_stage_dict_2)
 
     # 3. Normalization
-    stages_executed.append({
+    _t0_3 = time.perf_counter()
+    _stage_dict_3 = {
         "stage_id": "stage_3_normalization",
         "stage_index": 3,
         "name": "Normalization",
@@ -156,10 +159,16 @@ def execute_pipeline(txn: dict) -> dict:
             "account_dest_clean": dest.upper().strip(),
             "step": txn.get("step", 1)
         }
-    })
+    }
+    _t1_3 = time.perf_counter()
+    _dur_3 = (_t1_3 - _t0_3) * 1000
+    _timings["stage_3"] = _dur_3
+    _stage_dict_3["timing_ms"] = round(_dur_3, 2)
+    stages_executed.append(_stage_dict_3)
 
     # 4. Feature Engineering
-    stages_executed.append({
+    _t0_4 = time.perf_counter()
+    _stage_dict_4 = {
         "stage_id": "stage_4_feature_eng",
         "stage_index": 4,
         "name": "Feature Engineering",
@@ -176,10 +185,16 @@ def execute_pipeline(txn: dict) -> dict:
                 "transfer_amount_log": round(float(np.log1p(amount)), 3)
             }
         }
-    })
+    }
+    _t1_4 = time.perf_counter()
+    _dur_4 = (_t1_4 - _t0_4) * 1000
+    _timings["stage_4"] = _dur_4
+    _stage_dict_4["timing_ms"] = round(_dur_4, 2)
+    stages_executed.append(_stage_dict_4)
 
     # 5. Behavior Analysis
-    stages_executed.append({
+    _t0_5 = time.perf_counter()
+    _stage_dict_5 = {
         "stage_id": "stage_5_behavior",
         "stage_index": 5,
         "name": "Behavior Analysis",
@@ -193,10 +208,16 @@ def execute_pipeline(txn: dict) -> dict:
             "new_beneficiary_flag": True,
             "behavioral_anomaly_score": 0.84
         }
-    })
+    }
+    _t1_5 = time.perf_counter()
+    _dur_5 = (_t1_5 - _t0_5) * 1000
+    _timings["stage_5"] = _dur_5
+    _stage_dict_5["timing_ms"] = round(_dur_5, 2)
+    stages_executed.append(_stage_dict_5)
 
     # 6. Cyber Correlation
-    stages_executed.append({
+    _t0_6 = time.perf_counter()
+    _stage_dict_6 = {
         "stage_id": "stage_6_cyber",
         "stage_index": 6,
         "name": "Cyber Correlation",
@@ -216,10 +237,16 @@ def execute_pipeline(txn: dict) -> dict:
                 "speed_kmh": 405000
             } if has_cyber else None
         }
-    })
+    }
+    _t1_6 = time.perf_counter()
+    _dur_6 = (_t1_6 - _t0_6) * 1000
+    _timings["stage_6"] = _dur_6
+    _stage_dict_6["timing_ms"] = round(_dur_6, 2)
+    stages_executed.append(_stage_dict_6)
 
     # 7. Device Intelligence
-    stages_executed.append({
+    _t0_7 = time.perf_counter()
+    _stage_dict_7 = {
         "stage_id": "stage_7_device",
         "stage_index": 7,
         "name": "Device Intelligence",
@@ -234,10 +261,16 @@ def execute_pipeline(txn: dict) -> dict:
             "is_proxy_or_vpn": True,
             "fingerprint_matched": True
         }
-    })
+    }
+    _t1_7 = time.perf_counter()
+    _dur_7 = (_t1_7 - _t0_7) * 1000
+    _timings["stage_7"] = _dur_7
+    _stage_dict_7["timing_ms"] = round(_dur_7, 2)
+    stages_executed.append(_stage_dict_7)
 
     # 8. Graph Lookup
-    stages_executed.append({
+    _t0_8 = time.perf_counter()
+    _stage_dict_8 = {
         "stage_id": "stage_8_graph_lookup",
         "stage_index": 8,
         "name": "Graph Lookup",
@@ -252,10 +285,16 @@ def execute_pipeline(txn: dict) -> dict:
             "connected_devices": [device_id],
             "connected_ips": [ip]
         }
-    })
+    }
+    _t1_8 = time.perf_counter()
+    _dur_8 = (_t1_8 - _t0_8) * 1000
+    _timings["stage_8"] = _dur_8
+    _stage_dict_8["timing_ms"] = round(_dur_8, 2)
+    stages_executed.append(_stage_dict_8)
 
     # 9. GraphSAGE Embedding
-    stages_executed.append({
+    _t0_9 = time.perf_counter()
+    _stage_dict_9 = {
         "stage_id": "stage_9_graph_sage",
         "stage_index": 9,
         "name": "GraphSAGE Embedding",
@@ -269,10 +308,16 @@ def execute_pipeline(txn: dict) -> dict:
             "embedding_dimension": 64,
             "embedding_vector_sample": [0.142, -0.891, 0.442, 0.012, -0.301, 0.655, 0.119, -0.045]
         }
-    })
+    }
+    _t1_9 = time.perf_counter()
+    _dur_9 = (_t1_9 - _t0_9) * 1000
+    _timings["stage_9"] = _dur_9
+    _stage_dict_9["timing_ms"] = round(_dur_9, 2)
+    stages_executed.append(_stage_dict_9)
 
     # 10. LightGBM Prediction
-    stages_executed.append({
+    _t0_10 = time.perf_counter()
+    _stage_dict_10 = {
         "stage_id": "stage_10_lightgbm",
         "stage_index": 10,
         "name": "LightGBM Prediction",
@@ -285,10 +330,16 @@ def execute_pipeline(txn: dict) -> dict:
             "risk_tier": "HIGH" if lgbm_prob >= 0.7 else ("MEDIUM" if lgbm_prob >= 0.4 else "LOW"),
             "trees_evaluated": 100
         }
-    })
+    }
+    _t1_10 = time.perf_counter()
+    _dur_10 = (_t1_10 - _t0_10) * 1000
+    _timings["stage_10"] = _dur_10
+    _stage_dict_10["timing_ms"] = round(_dur_10, 2)
+    stages_executed.append(_stage_dict_10)
 
     # 11. Isolation Forest
-    stages_executed.append({
+    _t0_11 = time.perf_counter()
+    _stage_dict_11 = {
         "stage_id": "stage_11_iso_forest",
         "stage_index": 11,
         "name": "Isolation Forest",
@@ -301,10 +352,16 @@ def execute_pipeline(txn: dict) -> dict:
             "zero_day_pattern_flag": iso_score_raw < -0.15,
             "tree_depth_avg": 4.2
         }
-    })
+    }
+    _t1_11 = time.perf_counter()
+    _dur_11 = (_t1_11 - _t0_11) * 1000
+    _timings["stage_11"] = _dur_11
+    _stage_dict_11["timing_ms"] = round(_dur_11, 2)
+    stages_executed.append(_stage_dict_11)
 
     # 12. SHAP Explanation
-    stages_executed.append({
+    _t0_12 = time.perf_counter()
+    _stage_dict_12 = {
         "stage_id": "stage_12_shap",
         "stage_index": 12,
         "name": "SHAP Explanation",
@@ -316,10 +373,16 @@ def execute_pipeline(txn: dict) -> dict:
             "feature_impacts": shap_values,
             "base_value": 0.12
         }
-    })
+    }
+    _t1_12 = time.perf_counter()
+    _dur_12 = (_t1_12 - _t0_12) * 1000
+    _timings["stage_12"] = _dur_12
+    _stage_dict_12["timing_ms"] = round(_dur_12, 2)
+    stages_executed.append(_stage_dict_12)
 
     # 13. Risk Fusion Engine
-    stages_executed.append({
+    _t0_13 = time.perf_counter()
+    _stage_dict_13 = {
         "stage_id": "stage_13_fusion",
         "stage_index": 13,
         "name": "Risk Fusion Engine",
@@ -336,10 +399,16 @@ def execute_pipeline(txn: dict) -> dict:
             },
             "reasons": reasons
         }
-    })
+    }
+    _t1_13 = time.perf_counter()
+    _dur_13 = (_t1_13 - _t0_13) * 1000
+    _timings["stage_13"] = _dur_13
+    _stage_dict_13["timing_ms"] = round(_dur_13, 2)
+    stages_executed.append(_stage_dict_13)
 
     # 14. Decision Engine
-    stages_executed.append({
+    _t0_14 = time.perf_counter()
+    _stage_dict_14 = {
         "stage_id": "stage_14_decision",
         "stage_index": 14,
         "name": "Decision Engine",
@@ -351,12 +420,18 @@ def execute_pipeline(txn: dict) -> dict:
             "policy_rule_triggered": "RULE_CRITICAL_FUSION_BLOCK" if action == "BLOCK" else "RULE_STANDARD_EVAL",
             "counterfactual": f"With no prior cyber compromise, score = 61 -> CHALLENGE, not BLOCK." if has_cyber else "Standard baseline."
         }
-    })
+    }
+    _t1_14 = time.perf_counter()
+    _dur_14 = (_t1_14 - _t0_14) * 1000
+    _timings["stage_14"] = _dur_14
+    _stage_dict_14["timing_ms"] = round(_dur_14, 2)
+    stages_executed.append(_stage_dict_14)
 
     # 15. Evidence Generator
     evidence_payload_str = f"{txn_id}:{composite_score}:{action}:{timestamp}"
     evidence_hash = hashlib.sha256(evidence_payload_str.encode()).hexdigest()
-    stages_executed.append({
+    _t0_15 = time.perf_counter()
+    _stage_dict_15 = {
         "stage_id": "stage_15_evidence",
         "stage_index": 15,
         "name": "Evidence Generator",
@@ -370,10 +445,16 @@ def execute_pipeline(txn: dict) -> dict:
             "audit_log_timestamp": timestamp,
             "immutable_ledger_record": f"BLOCK:{evidence_hash[:16]}"
         }
-    })
+    }
+    _t1_15 = time.perf_counter()
+    _dur_15 = (_t1_15 - _t0_15) * 1000
+    _timings["stage_15"] = _dur_15
+    _stage_dict_15["timing_ms"] = round(_dur_15, 2)
+    stages_executed.append(_stage_dict_15)
 
     # 16. Operations Center
-    stages_executed.append({
+    _t0_16 = time.perf_counter()
+    _stage_dict_16 = {
         "stage_id": "stage_16_ops_center",
         "stage_index": 16,
         "name": "Operations Center",
@@ -387,7 +468,12 @@ def execute_pipeline(txn: dict) -> dict:
             "sla_countdown": "04m 59s",
             "soc_queue_status": "LOCKED_IN_TRIAGE"
         }
-    })
+    }
+    _t1_16 = time.perf_counter()
+    _dur_16 = (_t1_16 - _t0_16) * 1000
+    _timings["stage_16"] = _dur_16
+    _stage_dict_16["timing_ms"] = round(_dur_16, 2)
+    stages_executed.append(_stage_dict_16)
 
     # High-level pipeline structure
     data_flow = [
@@ -403,6 +489,13 @@ def execute_pipeline(txn: dict) -> dict:
     checklist_summary = [s["checklist_item"] for s in stages_executed]
 
     # Compute comprehensive Trust Engine & Hyperledger Fabric metrics
+    _timings["total_latency_ms"] = (time.perf_counter() - _t_start_total) * 1000
+    _timings["inference_ms"] = _timings.get("stage_10", 0) + _timings.get("stage_11", 0)
+    _timings["neo4j_lookup_ms"] = _timings.get("stage_8", 0)
+    _timings["feature_eng_ms"] = _timings.get("stage_4", 0)
+    _timings["shap_explain_ms"] = _timings.get("stage_12", 0)
+    _timings["ledger_commit_ms"] = _timings.get("stage_15", 0)
+    txn["_timings"] = _timings
     trust_metrics = compute_investigation_trust(txn, {"score": composite_score, "action": action})
 
     return {
