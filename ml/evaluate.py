@@ -15,6 +15,11 @@ def evaluate():
     df = pd.read_csv(eval_csv)
     y_true = df["is_fraud"].values
     
+    # Defaults for cost model
+    FN_COST = 250000
+    FP_COST = 400
+    n_total = len(y_true)
+    
     print("Scoring transaction-only baseline...")
     y_prob_txn = tabular_score(df, use_fusion=False)
     
@@ -27,12 +32,12 @@ def evaluate():
     
     def get_metrics(y_prob, threshold=0.5):
         y_pred = (y_prob >= threshold).astype(int)
-        cm = confusion_matrix(y_true, y_pred)
-        if cm.shape == (2, 2):
-            tn, fp, fn, tp = cm.ravel()
-        else:
-            tn, fp, fn, tp = 0, 0, 0, 0
+        cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
+        tn, fp, fn, tp = cm.ravel()
             
+        total_cost = (fn * FN_COST) + (fp * FP_COST)
+        cost_per_million = (total_cost / n_total) * 1_000_000
+        
         return {
             "pr_auc": float(average_precision_score(y_true, y_prob)),
             "precision": float(precision_score(y_true, y_pred, zero_division=0)),
@@ -43,10 +48,12 @@ def evaluate():
                 "FP": int(fp),
                 "TN": int(tn),
                 "FN": int(fn)
-            }
+            },
+            "total_cost": float(total_cost),
+            "cost_per_million": float(cost_per_million)
         }
 
-    print("Computing metrics...")
+    print("Computing baseline metrics...")
     metrics_txn = get_metrics(y_prob_txn)
     metrics_cyber = get_metrics(y_prob_cyber)
     metrics_fusion = get_metrics(y_prob_fusion)
@@ -71,6 +78,46 @@ def evaluate():
         f.write("```json\n")
         f.write(json.dumps(results, indent=2))
         f.write("\n```\n")
+
+    print("Computing threshold sweeps (0-100)...")
+    sweep_results = {
+        "transaction_only": [],
+        "cyber_only": [],
+        "full_fusion": []
+    }
+    
+    def generate_sweep(y_prob):
+        pts = []
+        for t_int in range(101):
+            threshold = t_int / 100.0
+            y_pred = (y_prob >= threshold).astype(int)
+            cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
+            tn, fp, fn, tp = cm.ravel()
+            
+            prec = float(precision_score(y_true, y_pred, zero_division=0))
+            rec = float(recall_score(y_true, y_pred, zero_division=0))
+            total_cost = (fn * FN_COST) + (fp * FP_COST)
+            
+            pts.append({
+                "threshold_int": t_int,
+                "threshold": threshold,
+                "precision": prec,
+                "recall": rec,
+                "FP": int(fp),
+                "FN": int(fn),
+                "total_cost": float(total_cost)
+            })
+        return pts
+    
+    sweep_results["transaction_only"] = generate_sweep(y_prob_txn)
+    sweep_results["cyber_only"] = generate_sweep(y_prob_cyber)
+    sweep_results["full_fusion"] = generate_sweep(y_prob_fusion)
+    
+    sweep_path = Path(__file__).parent / "sweep_cache.json"
+    with open(sweep_path, "w") as f:
+        json.dump(sweep_results, f)
+        
+    print(f"Sweep results cached to {sweep_path}")
     print("Done.")
 
 if __name__ == "__main__":

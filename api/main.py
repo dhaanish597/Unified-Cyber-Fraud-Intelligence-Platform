@@ -880,6 +880,36 @@ async def get_metrics_evaluate():
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/metrics/threshold_sweep")
+async def get_metrics_threshold_sweep():
+    import json
+    sweep_path = ROOT / "ml" / "sweep_cache.json"
+    try:
+        content = sweep_path.read_text()
+        return json.loads(content)
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/metrics/cost")
+async def get_metrics_cost(fn_cost: float = 250000.0, fp_cost: float = 400.0):
+    import json
+    sweep_path = ROOT / "ml" / "sweep_cache.json"
+    try:
+        content = sweep_path.read_text()
+        data = json.loads(content)
+        
+        recomputed = {}
+        for config_name, sweep_pts in data.items():
+            recomputed[config_name] = []
+            for pt in sweep_pts:
+                new_pt = dict(pt)
+                new_pt["total_cost"] = (new_pt["FN"] * fn_cost) + (new_pt["FP"] * fp_cost)
+                recomputed[config_name].append(new_pt)
+                
+        return recomputed
+    except Exception as e:
+        return {"error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api.main:app", host="0.0.0.0", port=8001, reload=True)
