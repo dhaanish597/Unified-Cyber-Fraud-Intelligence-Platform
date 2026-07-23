@@ -1,38 +1,98 @@
 import datetime
-
+import math
 from typing import Dict, List, Any
 
 class CustomerDigitalTwin:
-    """
-    Customer Digital Twin Engine for Fusion Risk OS.
-    Maintains a continuously evolving single source of truth for a customer's identity,
-    devices, locations, transaction habits, graph centrality, risk history, and predictive profile.
-    """
     def __init__(self, user_id: str = "usr_abc"):
         self.user_id = user_id
         
-        # PART 2: IDENTITY PROFILE
+        # Load Universe
+        universe = None
+        try:
+            import api.main
+            universe = api.main.cached_universe
+        except ImportError:
+            pass
+            
+        txns = []
+        customer = None
+        if universe:
+            txns = [t for t in universe.get("transactions", []) if t.get("user_id") == user_id or t.get("nameOrig", "").endswith(user_id)]
+            if not txns:
+                # Fallback matching logic for generated transaction user_ids
+                txns = [t for t in universe.get("transactions", []) if t.get("nameOrig", "").replace("ACC_", "").replace("_469", "") == user_id]
+            if not txns and user_id == "usr_abc":
+                txns = [t for t in universe.get("transactions", []) if t.get("nameOrig") == "ACC_ABC_123"]
+            
+            customer = next((c for c in universe.get("customers", []) if c["customer_id"] == user_id), None)
+            
+        self.baseline_status = "SUFFICIENT_HISTORY" if len(txns) > 0 else "INSUFFICIENT_HISTORY"
+        
+        # Compute baseline
+        self.amt_mean = 0.0
+        self.amt_std = 1.0
+        self.hour_hist = {h: 0 for h in range(24)}
+        self.known_devices = set()
+        self.known_geos = set()
+        self.counterparty_set = set()
+        self.last_risk_update = datetime.datetime.now()
+        
+        if customer:
+            self.known_geos.add(customer.get("city", "Mumbai"))
+            bprof = customer.get("behavior_profile", {})
+            self.known_devices.add(bprof.get("primary_device_id", "dev_9999"))
+            for ip in bprof.get("trusted_ip_subnets", []):
+                self.known_geos.add(ip)
+        else:
+            self.known_devices.add("dev_9999")
+            self.known_geos.add("Mumbai")
+            self.known_geos.add("185.15.2.22")
+            
+        if self.baseline_status == "SUFFICIENT_HISTORY":
+            amounts = [float(t.get("amount", 0.0)) for t in txns]
+            self.amt_mean = sum(amounts) / len(amounts)
+            if len(amounts) > 1:
+                self.amt_std = math.sqrt(sum((x - self.amt_mean)**2 for x in amounts) / (len(amounts) - 1))
+            else:
+                self.amt_std = self.amt_mean * 0.1 if self.amt_mean > 0 else 1.0
+            if self.amt_std < 1.0:
+                self.amt_std = 1.0
+                
+            for t in txns:
+                dt_str = t.get("timestamp", "2026-01-01 00:00:00")
+                try:
+                    dt = datetime.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+                    self.hour_hist[dt.hour] += 1
+                except:
+                    pass
+                dest = t.get("nameDest", "")
+                if dest:
+                    self.counterparty_set.add(dest)
+        else:
+            self.amt_mean = 3200.0
+            self.amt_std = 1500.0
+            self.hour_hist = {h: (10 if 8 <= h <= 21 else 1) for h in range(24)}
+
+        c_name = customer["full_name"] if customer else (f"Customer {user_id}" if user_id != "usr_abc" else "Rajesh Kumar")
+        c_tier = customer["risk_tier"] if customer else ("HIGH" if user_id == "usr_abc" else "LOW")
+        
         self.identity = {
             "customer_id": user_id,
-            "full_name": "Rajesh Kumar" if user_id == "usr_abc" else f"Customer {user_id}",
-            "kyc_status": "VERIFIED TIER-3 (BIOMETRIC)",
-            "occupation": "Software Principal Engineer",
-            "annual_salary": 3600000.0,
-            "risk_tier": "HIGH" if user_id == "usr_abc" else "LOW",
-            "relationship_manager": "RM_ANKIT_SHARMA",
-            "primary_account": "ACC_ABC_123" if user_id == "usr_abc" else f"ACC_{user_id.upper()}",
+            "full_name": c_name,
+            "kyc_status": customer.get("kyc_status", "VERIFIED TIER-3 (BIOMETRIC)") if customer else "VERIFIED TIER-3 (BIOMETRIC)",
+            "occupation": customer.get("occupation", "Software Principal Engineer") if customer else "Software Principal Engineer",
+            "annual_salary": customer.get("annual_salary", 3600000.0) if customer else 3600000.0,
+            "risk_tier": c_tier,
+            "relationship_manager": customer.get("relationship_manager", "RM_ANKIT_SHARMA") if customer else "RM_ANKIT_SHARMA",
+            "primary_account": customer.get("primary_account", f"ACC_{user_id.upper()}") if customer else f"ACC_{user_id.upper()}",
             "account_types": ["SAVINGS", "SALARY", "CREDIT_PLATINUM"],
             "historical_fraud_count": 0,
-            "trust_level": 94.5, # 0.0 to 100.0
+            "trust_level": 94.5,
             "created_at": "2020-03-15 09:00:00"
         }
-
-        # PART 3: DEVICE PROFILE
+        
         self.devices = {
-            "trusted_devices": [
-                {"device_id": "dev_9999", "name": "iPhone 15 Pro", "os": "iOS 17.5.1", "browser": "Safari Mobile", "fingerprint": "FP_a1b2c3d4e5", "trust_score": 0.98, "is_rooted": False},
-                {"device_id": "dev_1103", "name": "MacBook Pro M3", "os": "macOS Sonoma 14.5", "browser": "Chrome Desktop", "fingerprint": "FP_f6g7h8i9j0", "trust_score": 0.96, "is_rooted": False}
-            ],
+            "trusted_devices": [{"device_id": d, "trust_score": 0.98} for d in self.known_devices],
             "new_devices": [],
             "compromised_devices": [],
             "browser_history": ["Chrome Desktop", "Safari Mobile", "Edge Desktop"],
@@ -42,61 +102,53 @@ class CustomerDigitalTwin:
             "device_trust_score": 0.97,
             "root_detection_flag": False
         }
-
-        # PART 4: LOCATION PROFILE
+        
         self.locations = {
-            "trusted_cities": ["Mumbai", "Pune"],
-            "home_location": {"city": "Mumbai", "state": "Maharashtra", "country": "India", "lat": 19.0760, "lon": 72.8777},
-            "office_location": {"city": "Mumbai", "state": "Maharashtra", "lat": 19.0880, "lon": 72.8890},
-            "travel_history": [
-                {"city": "Mumbai", "timestamp": "2026-07-15 18:30:00", "is_home": True},
-                {"city": "Pune", "timestamp": "2026-06-20 11:00:00", "is_home": False}
-            ],
+            "trusted_cities": list(self.known_geos),
+            "home_location": {"city": customer.get("city", "Mumbai") if customer else "Mumbai"},
+            "office_location": {"city": customer.get("city", "Mumbai") if customer else "Mumbai"},
+            "travel_history": [],
             "foreign_countries_visited": [],
             "geo_velocity_kmh": 12.5,
             "impossible_travel_events": [],
             "vpn_usage_count": 0
         }
-
-        # PART 5: TRANSACTION PROFILE
+        
         self.transactions_profile = {
-            "avg_daily_spend": 3200.0,
-            "avg_monthly_spend": 85000.0,
-            "normal_amount_range": {"min": 200.0, "max": 50000.0},
-            "max_historical_single_tx": 125000.0,
+            "avg_daily_spend": self.amt_mean,
+            "avg_monthly_spend": self.amt_mean * 30,
+            "normal_amount_range": {"min": max(0.0, self.amt_mean - self.amt_std), "max": self.amt_mean + 2*self.amt_std},
+            "max_historical_single_tx": self.amt_mean + 3*self.amt_std,
             "transfer_frequency_per_week": 4.5,
-            "merchant_preferences": ["Amazon Retail", "Swiggy", "Indian Oil", "Supermarket Hub"],
-            "preferred_beneficiaries": ["ACC_BENEF_101", "ACC_BENEF_202", "ACC_FRIEND_99"],
+            "merchant_preferences": [],
+            "preferred_beneficiaries": list(self.counterparty_set),
             "salary_pattern": {"credited_day": 1, "avg_salary": 300000.0},
             "emi_pattern": {"emi_day": 5, "avg_emi": 45000.0},
             "utility_pattern": {"bill_day": 10, "avg_utility": 4500.0},
             "cash_withdrawal_pattern": {"frequency_days": 15, "avg_cash": 10000.0}
         }
-
-        # PART 6: BEHAVIOR PROFILE
+        
         self.behavior = {
-            "preferred_login_hours": [8, 9, 10, 11, 14, 15, 19, 20, 21],
+            "preferred_login_hours": [h for h, c in self.hour_hist.items() if c > 0],
             "avg_session_duration_sec": 240,
             "weekend_spending_ratio": 0.35,
-            "night_activity_ratio": 0.02, # 12 AM to 5 AM activity ratio
+            "night_activity_ratio": 0.02,
             "holiday_behavior_score": 0.88,
-            "behavior_drift_index": 0.04 # Low drift
+            "behavior_drift_index": 0.04
         }
-
-        # PART 7: GRAPH PROFILE
+        
         self.graph = {
-            "neighborhood_size": 28,
+            "neighborhood_size": len(self.counterparty_set),
             "community_id": "COMMUNITY_WEST_RETAIL_12",
-            "distance_to_known_mule_ring": 5, # Safe distance
+            "distance_to_known_mule_ring": 5,
             "pagerank_score": 0.0042,
             "betweenness_centrality": 0.0015,
             "risk_neighbors_count": 0,
             "fraud_cluster_membership": None
         }
-
-        # PART 8: RISK PROFILE
+        
         self.risk = {
-            "current_risk": 15.0, # Normal
+            "current_risk": 15.0,
             "historical_risk": [12.0, 14.0, 15.0, 18.0, 15.0],
             "risk_trend": "STABLE",
             "average_risk": 14.8,
@@ -105,33 +157,32 @@ class CustomerDigitalTwin:
             "blocked_cases_count": 0,
             "false_positives_count": 0
         }
-
-        # PART 11: PREDICTIVE ENGINE FORECASTS
+        
         self.predictions = {
             "predicted_next_login": "2026-07-23 09:15:00 IST",
             "predicted_next_amount_range": "INR 500.00 – INR 4,500.00",
             "likely_merchant": "Swiggy Food Delivery",
-            "likely_device": "iPhone 15 Pro (dev_9999)",
+            "likely_device": "iPhone 15 Pro",
             "likely_location": "Mumbai, Maharashtra",
-            "expected_daily_spend": 3200.0,
-            "expected_weekly_spend": 22400.0
+            "expected_daily_spend": self.amt_mean,
+            "expected_weekly_spend": self.amt_mean * 7
         }
-
-        # PART 12: CHRONOLOGICAL TIMELINE
+        
         self.timeline = [
-            {"timestamp": "2020-03-15 09:00:00", "event_type": "ACCOUNT_CREATED", "title": "Account Opened", "description": "Primary Savings Account ACC_ABC_123 opened at Nariman Point Branch."},
-            {"timestamp": "2020-03-16 10:15:00", "event_type": "DEVICE_ADDED", "title": "Primary Device Registered", "description": "iPhone 15 Pro (dev_9999) bound to mobile banking app."},
-            {"timestamp": "2021-06-01 14:00:00", "event_type": "BENEFICIARY_ADDED", "title": "Trusted Beneficiary Added", "description": "ACC_BENEF_101 added with biometric MFA authorization."},
-            {"timestamp": "2026-07-15 18:30:00", "event_type": "ROUTINE_TRANSACTION", "title": "Merchant Payment", "description": "₹1,250 spent at Swiggy via UPI_GATEWAY."}
+            {"timestamp": "2020-03-15 09:00:00", "event_type": "ACCOUNT_CREATED", "title": "Account Opened", "description": f"Account opened for {c_name}."}
         ]
 
     def update_twin(self, event_data: dict) -> dict:
-        """
-        Updates the Digital Twin dynamically from live streaming events.
-        Part 1 & Part 15 of Customer Digital Twin Engine.
-        """
         msg_type = event_data.get("msg_type", "transaction")
         timestamp = event_data.get("timestamp", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        
+        # Risk Decay
+        now = datetime.datetime.now()
+        hours_passed = (now - self.last_risk_update).total_seconds() / 3600.0
+        if hours_passed > 0:
+            decay = hours_passed * 0.5
+            self.risk["current_risk"] = max(15.0, self.risk["current_risk"] - decay)
+        self.last_risk_update = now
 
         if msg_type == "cyber_event":
             evt_type = event_data.get("event_type", "unknown")
@@ -139,7 +190,6 @@ class CustomerDigitalTwin:
             ip = event_data.get("ip", "185.15.2.22")
             km = event_data.get("km_from_baseline", 0)
 
-            # Update Location Profile if impossible travel
             if km > 1000 or "impossible_travel" in evt_type:
                 self.locations["impossible_travel_events"].append({
                     "timestamp": timestamp,
@@ -150,7 +200,6 @@ class CustomerDigitalTwin:
                 self.locations["vpn_usage_count"] += 1
                 self.locations["travel_history"].insert(0, {"city": "Moscow", "timestamp": timestamp, "is_home": False})
 
-            # Update Device Profile if compromised
             if "rooted" in evt_type or severity == "critical":
                 self.devices["device_trust_score"] = 0.12
                 self.devices["root_detection_flag"] = True
@@ -160,12 +209,11 @@ class CustomerDigitalTwin:
                     "flagged_at": timestamp
                 })
 
-            # Update Risk Profile
-            self.risk["current_risk"] = 94.0
+            risk_add = 40.0 if severity == "critical" else (20.0 if severity == "high" else 5.0)
+            self.risk["current_risk"] = min(100.0, self.risk["current_risk"] + risk_add)
             self.risk["risk_trend"] = "ESCALATING"
-            self.risk["historical_risk"].append(94.0)
-
-            # Append to Timeline
+            self.risk["historical_risk"].append(self.risk["current_risk"])
+            
             self.timeline.insert(0, {
                 "timestamp": timestamp,
                 "event_type": "CYBER_ALERT",
@@ -178,14 +226,13 @@ class CustomerDigitalTwin:
             dest = event_data.get("nameDest", "")
             is_compromised = event_data.get("cyber_compromise_in_window", False)
 
-            # Update Graph Profile if mule cluster detected
             if event_data.get("dest_mule_cluster_id"):
-                self.graph["distance_to_known_mule_ring"] = 1 # Direct 1-hop link to mule
+                self.graph["distance_to_known_mule_ring"] = 1
                 self.graph["risk_neighbors_count"] += 1
                 self.graph["fraud_cluster_membership"] = event_data["dest_mule_cluster_id"]
 
             if is_compromised or amount > 500000.0:
-                self.risk["current_risk"] = 94.0
+                self.risk["current_risk"] = min(100.0, self.risk["current_risk"] + 30.0)
                 self.risk["risk_trend"] = "ESCALATING"
                 self.risk["blocked_cases_count"] += 1
                 self.timeline.insert(0, {
@@ -205,39 +252,58 @@ class CustomerDigitalTwin:
         return self.get_full_profile()
 
     def compare_transaction(self, txn_data: dict) -> dict:
-        """
-        Part 9: DIGITAL TWIN COMPARISON & Part 10: DEVIATION ENGINE.
-        Compares expected customer baseline vs. observed incoming transaction.
-        """
         obs_amount = float(txn_data.get("amount", 0.0))
         obs_device = txn_data.get("device_id", "dev_9999")
         obs_ip = txn_data.get("ip", "185.15.2.22")
         obs_dest = txn_data.get("nameDest", "")
         obs_cyber = txn_data.get("cyber_compromise_in_window", False)
         obs_mule = txn_data.get("dest_mule_cluster_id")
+        
+        if self.baseline_status == "INSUFFICIENT_HISTORY":
+            overall_dev_index = 50.0
+            return {
+                "user_id": self.user_id,
+                "overall_deviation_index": overall_dev_index,
+                "verdict": "MODERATE_DEVIATION",
+                "deviations_breakdown": {
+                    "device_deviation": 50.0,
+                    "location_deviation": 50.0,
+                    "transaction_amount_deviation": 50.0,
+                    "beneficiary_deviation": 50.0,
+                    "cyber_telemetry_deviation": 99.0 if obs_cyber else 10.0,
+                    "graph_mule_ring_deviation": 96.0 if obs_mule else 10.0
+                },
+                "comparison_diffs": {
+                    "device_difference": "INSUFFICIENT_HISTORY",
+                    "location_difference": "INSUFFICIENT_HISTORY",
+                    "amount_difference": "INSUFFICIENT_HISTORY",
+                    "beneficiary_difference": "INSUFFICIENT_HISTORY",
+                    "velocity_difference": "INSUFFICIENT_HISTORY",
+                    "behavior_difference": "INSUFFICIENT_HISTORY"
+                }
+            }
 
-        # 1. Device Deviation (0 to 100)
-        trusted_dev_ids = [d["device_id"] for d in self.devices["trusted_devices"]]
-        device_diff = obs_device not in trusted_dev_ids or self.devices["root_detection_flag"]
+        # 1. Device Deviation
+        device_diff = obs_device not in self.known_devices or self.devices.get("root_detection_flag", False)
         device_dev_score = 95.0 if device_diff else 5.0
 
         # 2. Location Deviation
-        location_diff = obs_ip == "185.15.2.22" or obs_cyber
+        location_diff = (obs_ip not in self.known_geos and not any(city in obs_ip for city in self.known_geos)) or obs_cyber
         location_dev_score = 98.0 if location_diff else 4.0
 
-        # 3. Amount Deviation
-        amount_diff = obs_amount > self.transactions_profile["normal_amount_range"]["max"]
-        amount_dev_score = min(100.0, (obs_amount / 50000.0) * 20.0) if amount_diff else 8.0
+        # 3. Amount Deviation (Z-score)
+        z_score = (obs_amount - self.amt_mean) / self.amt_std if self.amt_std > 0 else 0
+        amount_dev_score = min(100.0, max(0.0, z_score * 25.0))
+        amount_diff = z_score > 3.0
 
         # 4. Merchant/Beneficiary Deviation
-        dest_diff = obs_dest not in self.transactions_profile["preferred_beneficiaries"]
+        dest_diff = obs_dest not in self.counterparty_set
         merchant_dev_score = 85.0 if obs_mule else (60.0 if dest_diff else 5.0)
 
         # 5. Cyber & Graph Deviation
         cyber_dev_score = 99.0 if obs_cyber else 2.0
         graph_dev_score = 96.0 if obs_mule else 5.0
 
-        # 6. Overall Deviation Index (Weighted average)
         overall_dev_index = round(
             (device_dev_score * 0.20) +
             (location_dev_score * 0.25) +
@@ -250,23 +316,23 @@ class CustomerDigitalTwin:
 
         return {
             "user_id": self.user_id,
-            "overall_deviation_index": overall_dev_index, # 0.0 to 100.0
+            "overall_deviation_index": overall_dev_index,
             "verdict": "CRITICAL_DEVIATION" if overall_dev_index > 75.0 else ("MODERATE_DEVIATION" if overall_dev_index > 40.0 else "NORMAL"),
             "deviations_breakdown": {
                 "device_deviation": device_dev_score,
                 "location_deviation": location_dev_score,
-                "transaction_amount_deviation": amount_dev_score,
+                "transaction_amount_deviation": round(amount_dev_score, 1),
                 "beneficiary_deviation": merchant_dev_score,
                 "cyber_telemetry_deviation": cyber_dev_score,
                 "graph_mule_ring_deviation": graph_dev_score
             },
             "comparison_diffs": {
-                "device_difference": "UNTRUSTED / PROXY DEVICE (dev_9999 from Moscow IP)" if device_diff else "MATCHES_REGISTERED_IPHONE",
-                "location_difference": "IMPOSSIBLE TRAVEL (Moscow, RU vs Home Mumbai)" if location_diff else "HOME_GEOLOCATION_MATCH",
-                "amount_difference": f"ANOMALOUS SPIKE (INR {obs_amount:,.2f} vs Max Normal INR 50,000.00)" if amount_diff else "WITHIN_EXPECTED_RANGE",
-                "beneficiary_difference": f"UNSEEN MULE RECIPIENT ({obs_dest} linked to {obs_mule})" if obs_mule else "KNOWN_BENEFICIARY",
-                "velocity_difference": "BURST VELOCITY (Transfer 40s after foreign login)",
-                "behavior_difference": "OFF-HOURS CRITICAL BALANCE DRAIN ATTEMPT"
+                "device_difference": f"UNTRUSTED DEVICE ({obs_device})" if device_diff else "MATCHES_REGISTERED_DEVICE",
+                "location_difference": f"ANOMALOUS LOCATION ({obs_ip})" if location_diff else "HOME_GEOLOCATION_MATCH",
+                "amount_difference": f"ANOMALOUS SPIKE (Z-score: {z_score:.1f})" if amount_diff else "WITHIN_EXPECTED_RANGE",
+                "beneficiary_difference": f"UNSEEN MULE RECIPIENT ({obs_dest})" if obs_mule else ("NEW_BENEFICIARY" if dest_diff else "KNOWN_BENEFICIARY"),
+                "velocity_difference": "BURST VELOCITY" if obs_cyber else "NORMAL_VELOCITY",
+                "behavior_difference": "OFF-HOURS ATTEMPT" if obs_cyber else "NORMAL_BEHAVIOR"
             }
         }
 
@@ -281,7 +347,8 @@ class CustomerDigitalTwin:
             "graph": self.graph,
             "risk": self.risk,
             "predictions": self.predictions,
-            "timeline": self.timeline
+            "timeline": self.timeline,
+            "baseline_status": getattr(self, 'baseline_status', 'INSUFFICIENT_HISTORY')
         }
 
 # Global in-memory Digital Twin Store
