@@ -264,6 +264,29 @@ export default function RealTimeProcessingPipeline({ activeTxn, evaluation, webs
     setExpandedStageId(expandedStageId === id ? null : id);
   };
 
+  const STAGE_ICONS = [
+    Inbox, CheckSquare, RefreshCw, Layers, Activity, ShieldAlert, Smartphone, Share2, 
+    Share2, Cpu, Cpu, FileText, Database, Shield, Lock, Radio
+  ];
+
+  const liveStages = (websocketStages || []).map((stg, i) => ({
+    id: stg.stage_id || `live_stg_${i}`,
+    name: stg.name || `Stage ${i + 1}`,
+    icon: STAGE_ICONS[i % STAGE_ICONS.length] || Activity,
+    status: stg.status ? stg.status.toUpperCase() : 'COMPLETED',
+    execTimeMs: stg.timing_ms !== undefined ? `${stg.timing_ms} ms` : '0.00 ms',
+    confidence: '100%',
+    summary: stg.summary || '',
+    details: stg.evidence || {}
+  }));
+
+  const hasLiveStages = liveStages.length > 0;
+  const stagesToRender = hasLiveStages ? liveStages : sequentialWorkflowStages;
+  
+  const totalLatency = hasLiveStages 
+    ? (websocketStages.reduce((sum, s) => sum + (s.timing_ms || 0), 0)).toFixed(2) + ' ms'
+    : '0.14 ms';
+
   return (
     <div className="bg-soc-surface border border-soc-border rounded-xl p-4 shadow-xl font-mono text-xs select-none space-y-4">
       
@@ -276,8 +299,8 @@ export default function RealTimeProcessingPipeline({ activeTxn, evaluation, webs
           <div>
             <h2 className="text-xs font-mono font-bold text-soc-text uppercase tracking-wider flex items-center gap-2">
               <span>Multi-Checkpoint Pre-Transaction Workflow</span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
-                10 SEQUENTIAL STAGES
+              <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${hasLiveStages ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'}`}>
+                {hasLiveStages ? `${stagesToRender.length} LIVE STAGES` : 'AWAITING LIVE STREAM'}
               </span>
             </h2>
             <p className="text-[11px] text-soc-muted">
@@ -303,14 +326,14 @@ export default function RealTimeProcessingPipeline({ activeTxn, evaluation, webs
           </select>
 
           <span className="text-[10px] font-mono px-2.5 py-1 bg-soc-panel border border-soc-border text-soc-muted rounded font-bold">
-            Total Pipeline Latency: <strong className="text-amber-400">0.14 ms</strong>
+            Total Pipeline Latency: <strong className="text-amber-400">{totalLatency}</strong>
           </span>
         </div>
       </div>
 
       {/* SEQUENTIAL WORKFLOW STAGES (EXPANDABLE ONE AT A TIME) */}
       <div className="space-y-2">
-        {sequentialWorkflowStages.map((stg) => {
+        {stagesToRender.map((stg) => {
           const Icon = stg.icon;
           const isExpanded = expandedStageId === stg.id;
           const isFlagged = stg.status.includes('FLAGGED') || stg.status.includes('CRITICAL') || stg.status.includes('MULE') || stg.status.includes('BLOCK');
