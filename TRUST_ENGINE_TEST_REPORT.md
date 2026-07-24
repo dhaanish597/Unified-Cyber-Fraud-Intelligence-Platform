@@ -9,8 +9,10 @@ Revision under test includes the Phase 3 backend, API/WebSocket integration, Rea
 Command:
 
 ```text
-python -m pytest -q api/test_session_intelligence_phase3.py
+python -m pytest -q api/test_cyber_threat_engine.py api/test_session_intelligence_phase3.py
 ```
+
+Result: **13 passed** in 32.16 seconds. One third-party ReportLab deprecation warning was emitted.
 
 Coverage implemented in `api/test_session_intelligence_phase3.py`:
 
@@ -50,9 +52,9 @@ This measures the Session Intelligence reducer and local SQLite commit on the ve
 | Artifact | Command | Result |
 |---|---|---|
 | React production build | `npm run build` in `web` | PASS; 3,148 modules |
-| React assets | Vite output | 1,066,095 bytes |
+| React assets | Vite output | 1,068,718 bytes |
 | Android debug APK | Gradle 8.11.1 `:app:assembleDebug` with local Android SDK | PASS |
-| Android APK size | `app-debug.apk` | 18,001,915 bytes |
+| Android APK size | `app-debug.apk` | 18,001,991 bytes |
 | Python syntax | `python -m compileall -q api/session_intelligence api/main.py` | PASS |
 
 The Android build also verified and corrected pre-existing blockers: invalid `debuggable` DSL, missing launcher resources, missing `savedInstanceState` call, and missing `MutableStateFlow` import.
@@ -77,4 +79,3 @@ The Android build also verified and corrected pre-existing blockers: invalid `de
 ## Readiness
 
 Phase 3 implementation meets its repository-level functional and performance assertions. Before national-scale production deployment, run distributed load, multi-worker pub/sub, authenticated API gateway, TLS/certificate pinning, and physical-device reconnect tests in the target environment.
-
