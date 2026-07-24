@@ -1,10 +1,11 @@
 import asyncio
+import json
 import sys
 import io
 import datetime
 from pathlib import Path
 import pandas as pd
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -34,6 +35,11 @@ from api.trust_fabric_engine import trust_fabric
 from api.quantum_trust_layer import quantum_trust
 from api.sdk_engine import sdk_engine
 from api.cyber_threat_engine import cyber_threat_engine
+from api.session_intelligence import (
+    SessionLifecycle,
+    session_intelligence,
+    trust_update_broker,
+)
 from ml.predict import _get_fusion_model, _prepare_single
 from api.gateway_integration import router as gateway_router
 
@@ -526,6 +532,10 @@ class SessionUpdateRequest(BaseModel):
 class SessionRecalculateRequest(BaseModel):
     session_id: str = "SESS_9921_CRITICAL"
 
+
+class TrustRecalculateRequest(BaseModel):
+    session_id: str
+
 @app.post("/session/analyse")
 async def analyse_pre_transaction_session(req: SessionAnalyseRequest):
     passport = session_engine.analyse_session(req.dict())
@@ -546,6 +556,121 @@ async def recalculate_session_trust(req: SessionRecalculateRequest):
     passport = session_engine.get_passport(req.session_id)
     updated = session_engine.analyse_session({"session_id": req.session_id, "user_id": passport.get("user_id", "usr_abc")})
     return updated
+
+
+# --- PHASE 3 ENTERPRISE SESSION INTELLIGENCE & TRUST PASSPORT ---
+@app.get("/sessions")
+async def list_live_sessions(
+    state: str | None = None,
+    search: str | None = None,
+    include_closed: bool = True,
+    limit: int = 200,
+):
+    lifecycle = None
+    if state:
+        try:
+            lifecycle = SessionLifecycle(state.upper())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"Unknown session state: {state}") from exc
+    sessions = session_intelligence.repository.list_sessions(
+        state=lifecycle,
+        search=search,
+        include_closed=include_closed,
+        limit=limit,
+    )
+    return {"sessions": [session.model_dump(mode="json") for session in sessions], "count": len(sessions)}
+
+
+@app.get("/sessions/{session_id}")
+async def get_live_session(session_id: str):
+    session = session_intelligence.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
+@app.get("/trust-passport")
+async def get_current_trust_passport(session_id: str | None = None):
+    passport = (
+        session_intelligence.repository.get_passport(session_id)
+        if session_id
+        else session_intelligence.repository.get_latest_passport()
+    )
+    if not passport:
+        raise HTTPException(status_code=404, detail="Trust Passport not found")
+    return passport.to_compatible_dict()
+
+
+@app.get("/trust-passport/{session_id}")
+async def get_trust_passport_by_session(session_id: str):
+    passport = session_intelligence.repository.get_passport(session_id)
+    if not passport:
+        raise HTTPException(status_code=404, detail="Trust Passport not found")
+    return passport.to_compatible_dict()
+
+
+@app.get("/trust-history/{session_id}")
+async def get_trust_history(
+    session_id: str,
+    range: str = Query(default="last_hour", pattern="^(last_minute|last_hour|last_day|custom)$"),
+    start: datetime.datetime | None = None,
+    end: datetime.datetime | None = None,
+    limit: int = 1000,
+):
+    if not session_intelligence.repository.get_passport(session_id):
+        raise HTTPException(status_code=404, detail="Trust Passport not found")
+    history = session_intelligence.get_history(session_id, range, start, end, limit)
+    return {
+        "session_id": session_id,
+        "range": range,
+        "snapshots": [snapshot.model_dump(mode="json") for snapshot in history],
+        "count": len(history),
+    }
+
+
+@app.get("/trust-components/{session_id}")
+async def get_trust_components(session_id: str):
+    passport = session_intelligence.repository.get_passport(session_id)
+    if not passport:
+        raise HTTPException(status_code=404, detail="Trust Passport not found")
+    return {
+        "session_id": session_id,
+        "overall_trust": passport.overall_trust,
+        "confidence": passport.confidence,
+        "trust_trend": passport.trust_trend,
+        "components": {
+            name.value: component.model_dump(mode="json")
+            for name, component in passport.components.items()
+        },
+        "deltas": [
+            delta.model_dump(mode="json")
+            for delta in session_intelligence.repository.get_deltas(session_id)
+        ],
+        "recovery_events": [
+            event.model_dump(mode="json")
+            for event in session_intelligence.repository.get_recovery_events(session_id)
+        ],
+    }
+
+
+@app.post("/trust/recalculate")
+async def recalculate_enterprise_trust(req: TrustRecalculateRequest):
+    try:
+        update = session_intelligence.recalculate(req.session_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
+    envelope = update.model_dump(mode="json")
+    await trust_update_broker.publish(envelope)
+    return envelope
+
+
+@app.get("/trust/live")
+async def get_live_trust_updates(session_id: str | None = None, limit: int = 50):
+    updates = trust_update_broker.recent(session_id=session_id, limit=limit)
+    return {
+        "updates": updates,
+        "count": len(updates),
+    }
 
 # --- INVESTIGATION INTELLIGENCE LAYER ENDPOINTS ---
 class InvestigationAnalyseRequest(BaseModel):
@@ -730,50 +855,92 @@ async def simulate_quantum_threat(req: QuantumSimulateRequest):
 
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    events = get_demo_events()
-    
-    try:
-        for event in events:
-            delay = event.pop('delay', 1.0)
-            await websocket.send_json(event)
+    session_filter = websocket.query_params.get("session_id")
+    subscription = await trust_update_broker.subscribe(session_filter)
 
-            # Live Update Customer Digital Twin
-            user_id = event.get("user_id", "usr_abc")
-            twin = get_or_create_digital_twin(user_id)
-            twin.update_twin(event)
-            
-            if event.get("msg_type") == "transaction":
-                # Execute pipeline and stream stage events sequentially
-                pipeline_data = execute_pipeline(event)
-                # First send full pipeline overview frame
+    try:
+        # Session-scoped SDK clients receive a current Trust Passport bootstrap
+        # and then only live trust updates. Existing unscoped dashboard clients
+        # retain the original scripted replay before entering live mode.
+        if session_filter:
+            passport = session_intelligence.repository.get_passport(session_filter)
+            if passport:
                 await websocket.send_json({
-                    "msg_type": "pipeline_overview",
-                    "data_flow": pipeline_data["data_flow"],
-                    "checklist_summary": pipeline_data["checklist_summary"],
-                    "composite_score": pipeline_data["composite_score"],
-                    "action": pipeline_data["action"]
+                    "msg_type": "trust_passport_update",
+                    "session_id": session_filter,
+                    "event_type": "TRUST_BOOTSTRAP",
+                    "passport": passport.to_compatible_dict(),
+                    "deltas": [],
                 })
-                # Stream each stage with evidence payload
-                for stage in pipeline_data["stages"]:
-                    await websocket.send_json({
-                        "msg_type": "pipeline_stage",
-                        "txn_id": pipeline_data["txn_id"],
-                        "stage_id": stage["stage_id"],
-                        "stage_index": stage["stage_index"],
-                        "name": stage["name"],
-                        "summary": stage["summary"],
-                        "checklist_item": stage["checklist_item"],
-                        "status": stage["status"],
-                        "evidence": stage["evidence"]
-                    })
-                    await asyncio.sleep(0.08)
-                    
-            await asyncio.sleep(delay)
-            
+        else:
+            for event in get_demo_events():
+                delay = event.pop("delay", 1.0)
+                await websocket.send_json(event)
+
+                user_id = event.get("user_id", "usr_abc")
+                twin = get_or_create_digital_twin(user_id)
+                twin.update_twin(event)
+
+                if event.get("msg_type") == "transaction":
+                    try:
+                        pipeline_data = execute_pipeline(event)
+                        await websocket.send_json({
+                            "msg_type": "pipeline_overview",
+                            "data_flow": pipeline_data["data_flow"],
+                            "checklist_summary": pipeline_data["checklist_summary"],
+                            "composite_score": pipeline_data["composite_score"],
+                            "action": pipeline_data["action"],
+                        })
+                        for stage in pipeline_data["stages"]:
+                            await websocket.send_json({
+                                "msg_type": "pipeline_stage",
+                                "txn_id": pipeline_data["txn_id"],
+                                "stage_id": stage["stage_id"],
+                                "stage_index": stage["stage_index"],
+                                "name": stage["name"],
+                                "summary": stage["summary"],
+                                "checklist_item": stage["checklist_item"],
+                                "status": stage["status"],
+                                "evidence": stage["evidence"],
+                            })
+                            await asyncio.sleep(0.08)
+                    except Exception as exc:
+                        # Preserve the stream for live trust subscribers even if
+                        # optional model artifacts for the legacy replay are absent.
+                        await websocket.send_json({
+                            "msg_type": "pipeline_error",
+                            "error": str(exc),
+                        })
+                await asyncio.sleep(delay)
+
+        while True:
+            receive_task = asyncio.create_task(websocket.receive_text())
+            update_task = asyncio.create_task(subscription.queue.get())
+            done, pending = await asyncio.wait(
+                {receive_task, update_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+            if update_task in done:
+                await websocket.send_json(update_task.result())
+            if receive_task in done:
+                message = receive_task.result()
+                if message.lower() == "ping":
+                    await websocket.send_json({"msg_type": "pong"})
+                else:
+                    try:
+                        command = json.loads(message)
+                    except json.JSONDecodeError:
+                        command = {}
+                    if command.get("type") == "ping":
+                        await websocket.send_json({"msg_type": "pong"})
     except WebSocketDisconnect:
         print("Client disconnected")
     except Exception as e:
         print(f"WebSocket error: {e}")
+    finally:
+        await trust_update_broker.unsubscribe(subscription.subscription_id)
 
 # --- FUSION ADAPTIVE TRUST SDK (FAT-SDK) ENDPOINTS ---
 class SDKSessionStartRequest(BaseModel):
@@ -827,7 +994,19 @@ class SDKDecisionRequest(BaseModel):
 
 @app.post("/sdk/session/start")
 async def sdk_session_start(req: SDKSessionStartRequest):
-    return sdk_engine.start_session(req.dict())
+    session = sdk_engine.start_session(req.dict())
+    device_profile = sdk_engine.device_profiles.get(session["device_id"], {})
+    device_event = {
+        **device_profile,
+        "session_id": session["session_id"],
+        "user_id": session["user_id"],
+        "device_id": session["device_id"],
+        "event_type": "DEVICE_ATTESTATION",
+    }
+    initial_threats = cyber_threat_engine.evaluate_event(device_event)
+    update = session_intelligence.start_session(session, device_event, initial_threats)
+    await trust_update_broker.publish(update.model_dump(mode="json"))
+    return session
 
 @app.post("/sdk/device")
 async def sdk_register_device(req: SDKDeviceRequest):
@@ -835,22 +1014,29 @@ async def sdk_register_device(req: SDKDeviceRequest):
 
 @app.post("/sdk/network")
 async def sdk_register_network(req: SDKNetworkRequest):
-    return sdk_engine.register_network(req.dict())
+    event = {**req.dict(), "event_type": "NETWORK_ATTESTATION"}
+    response = sdk_engine.register_network(req.dict())
+    threats = cyber_threat_engine.evaluate_event(event)
+    update = session_intelligence.process_event(event, threats)
+    await trust_update_broker.publish(update.model_dump(mode="json"))
+    return response
 
 @app.post("/sdk/event")
 async def sdk_ingest_event(req: SDKEventRequest):
     event_dict = req.dict()
     res = sdk_engine.ingest_event(event_dict)
-    # Evaluate Cyber Threat Engine (<100ms)
-    cyber_threat_engine.evaluate_event(event_dict)
+    threats = cyber_threat_engine.evaluate_event(event_dict)
+    update = session_intelligence.process_event(event_dict, threats)
+    await trust_update_broker.publish(update.model_dump(mode="json"))
     return res
 
 @app.post("/sdk/request-decision")
 async def sdk_request_decision(req: SDKDecisionRequest):
     dec_dict = req.dict()
     res = sdk_engine.request_decision(dec_dict)
-    # Evaluate Cyber Threat Engine (<100ms)
-    cyber_threat_engine.evaluate_event(dec_dict)
+    threats = cyber_threat_engine.evaluate_event(dec_dict)
+    update = session_intelligence.process_event(dec_dict, threats)
+    await trust_update_broker.publish(update.model_dump(mode="json"))
     return res
 
 @app.get("/sdk/policies")
@@ -859,6 +1045,9 @@ async def sdk_get_policies():
 
 @app.get("/sdk/passport")
 async def sdk_get_passport(session_id: str = "SDK_SESS_DEMO"):
+    passport = session_intelligence.repository.get_passport(session_id)
+    if passport:
+        return passport.to_compatible_dict()
     return sdk_engine.get_trust_passport(session_id)
 
 @app.get("/sdk/health")
