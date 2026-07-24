@@ -2,6 +2,16 @@ package com.fusionbank.mobileapp.sdk.models
 
 import com.google.gson.annotations.SerializedName
 
+data class SDKTokenRequest(
+    @SerializedName("client_id") val clientId: String,
+    @SerializedName("client_secret") val clientSecret: String
+)
+
+data class SDKTokenResponse(
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("expires_at") val expiresAt: Long
+)
+
 data class SDKSessionStartRequest(
     @SerializedName("app_id") val appId: String = "com.fusionbank.mobileapp",
     @SerializedName("tenant_id") val tenantId: String = "TENANT_FUSB_001",
@@ -22,12 +32,13 @@ data class SDKSessionResponse(
     @SerializedName("started_at") val startedAt: String,
     @SerializedName("status") val status: String,
     @SerializedName("policy_version") val policyVersion: String,
-    @SerializedName("composite_trust_score") val compositeTrustScore: Float,
-    @SerializedName("device_trust") val deviceTrust: Float,
-    @SerializedName("session_trust") val sessionTrust: Float,
-    @SerializedName("behaviour_trust") val behaviourTrust: Float,
-    @SerializedName("network_trust") val networkTrust: Float,
-    @SerializedName("runtime_trust") val runtimeTrust: Float
+    @SerializedName("composite_trust_score") val compositeTrustScore: Float?,
+    @SerializedName("device_trust") val deviceTrust: Float?,
+    @SerializedName("session_trust") val sessionTrust: Float?,
+    @SerializedName("behaviour_trust") val behaviourTrust: Float?,
+    @SerializedName("network_trust") val networkTrust: Float?,
+    @SerializedName("runtime_trust") val runtimeTrust: Float?,
+    @SerializedName("trust_status") val trustStatus: String = "PENDING_AUTHORITATIVE_EVIDENCE"
 )
 
 data class SDKDeviceRequest(
@@ -50,8 +61,8 @@ data class SDKDeviceResponse(
     @SerializedName("device_id") val deviceId: String,
     @SerializedName("fingerprint") val fingerprint: String,
     @SerializedName("play_integrity_status") val playIntegrityStatus: String,
-    @SerializedName("device_trust_score") val deviceTrustScore: Float,
-    @SerializedName("runtime_trust_score") val runtimeTrustScore: Float
+    @SerializedName("device_trust_score") val deviceTrustScore: Float?,
+    @SerializedName("runtime_trust_score") val runtimeTrustScore: Float?
 )
 
 data class SDKNetworkRequest(
@@ -69,7 +80,7 @@ data class SDKNetworkResponse(
     @SerializedName("carrier") val carrier: String,
     @SerializedName("vpn_detected") val vpnDetected: Boolean,
     @SerializedName("proxy_detected") val proxyDetected: Boolean,
-    @SerializedName("network_trust_score") val networkTrustScore: Float
+    @SerializedName("network_trust_score") val networkTrustScore: Float?
 )
 
 data class SDKEventRequest(
@@ -77,7 +88,6 @@ data class SDKEventRequest(
     @SerializedName("device_id") val deviceId: String,
     @SerializedName("event_type") val eventType: String,
     @SerializedName("amount") val amount: Double = 0.0,
-    @SerializedName("composite_trust") val compositeTrust: Float = 82.0f,
     @SerializedName("sdk_version") val sdkVersion: String = "FAT-SDK v2.4.1"
 )
 
@@ -93,10 +103,8 @@ data class SDKDecisionRequest(
     @SerializedName("session_id") val sessionId: String,
     @SerializedName("event_type") val eventType: String,
     @SerializedName("amount") val amount: Double,
-    @SerializedName("composite_trust") val compositeTrust: Float,
     @SerializedName("vpn_detected") val vpnDetected: Boolean = false,
-    @SerializedName("root_detected") val rootDetected: Boolean = false,
-    @SerializedName("runtime_trust") val runtimeTrust: Float = 94.0f
+    @SerializedName("root_detected") val rootDetected: Boolean = false
 )
 
 data class SDKDecisionResponse(
@@ -155,7 +163,7 @@ data class SDKTrustPassportResponse(
 data class SDKTrustComponent(
     @SerializedName("name") val name: String,
     @SerializedName("value") val value: Float,
-    @SerializedName("confidence") val confidence: Float,
+    @SerializedName("confidence") val confidence: Float?,
     @SerializedName("previous_value") val previousValue: Float,
     @SerializedName("difference") val difference: Float,
     @SerializedName("trend") val trend: String,

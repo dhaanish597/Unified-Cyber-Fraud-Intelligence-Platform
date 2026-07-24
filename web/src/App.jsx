@@ -27,7 +27,8 @@ import CyberThreatIntelligencePage from './pages/CyberThreatIntelligencePage';
 import SessionIntelligencePage from './pages/SessionIntelligencePage';
 
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const API_BASE = import.meta.env.VITE_API_BASE
+  || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid');
 
 export default function App() {
   const [quantumData, setQuantumData] = useState(null);

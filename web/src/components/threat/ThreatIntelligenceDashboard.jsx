@@ -22,7 +22,7 @@ import {
   Share2
 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid');
 
 export default function ThreatIntelligenceDashboard() {
   const [threats, setThreats] = useState([]);
@@ -242,7 +242,7 @@ export default function ThreatIntelligenceDashboard() {
                       </td>
 
                       <td className="py-3 px-3 font-bold text-emerald-400">
-                        {threat.confidence}%
+                        {threat.confidence == null ? 'N/A' : `${threat.confidence}%`}
                       </td>
 
                       <td className="py-3 px-3">
@@ -330,7 +330,9 @@ export default function ThreatIntelligenceDashboard() {
                 </div>
                 <div>
                   <span className="text-soc-dim block">Confidence Score:</span>
-                  <span className="text-emerald-400 font-bold">{activeThreatDetail.confidence}%</span>
+                  <span className="text-emerald-400 font-bold">
+                    {activeThreatDetail.confidence == null ? 'N/A' : `${activeThreatDetail.confidence}%`}
+                  </span>
                 </div>
                 <div>
                   <span className="text-soc-dim block">Session ID:</span>

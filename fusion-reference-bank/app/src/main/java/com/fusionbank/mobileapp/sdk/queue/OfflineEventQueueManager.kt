@@ -28,8 +28,7 @@ class OfflineEventQueueManager(
                 sessionId = request.sessionId,
                 deviceId = request.deviceId,
                 eventType = request.eventType,
-                amount = request.amount,
-                compositeTrust = request.compositeTrust
+                amount = request.amount
             )
             eventDao.insertEvent(entity)
             updateQueuedCount()
@@ -50,8 +49,7 @@ class OfflineEventQueueManager(
                         sessionId = event.sessionId,
                         deviceId = event.deviceId,
                         eventType = event.eventType,
-                        amount = event.amount,
-                        compositeTrust = event.compositeTrust
+                        amount = event.amount
                     )
                     val response = apiService.reportEvent(req)
                     if (response.isSuccessful) {

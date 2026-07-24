@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { authenticatedWebSocketUrl } from '../../platformAuth';
 import {
   Code2, Terminal, Zap, Globe, Shield, Radio, Play, Download,
   RefreshCw, CheckCircle2, AlertTriangle, Smartphone, Cpu, 
@@ -6,7 +7,7 @@ import {
   Copy, ExternalLink, Server, Lock, Layers
 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid');
 const WS_BASE = (import.meta.env.VITE_WS_BASE || API_BASE).replace(/^http/, 'ws');
 
 // ─── Syntax-highlight JSON for the API Explorer ───
@@ -150,7 +151,7 @@ export default function FATSDKDeveloperPortal() {
     let disposed = false;
     const connect = () => {
       setTrustStreamState('CONNECTING');
-      socket = new WebSocket(`${WS_BASE}/ws/stream?stream=trust`);
+      socket = new WebSocket(authenticatedWebSocketUrl(`${WS_BASE}/ws/stream?stream=trust`));
       socket.onopen = () => setTrustStreamState('LIVE');
       socket.onmessage = (message) => {
         const update = JSON.parse(message.data);

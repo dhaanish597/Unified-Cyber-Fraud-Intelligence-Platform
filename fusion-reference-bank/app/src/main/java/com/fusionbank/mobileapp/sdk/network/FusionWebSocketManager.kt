@@ -14,7 +14,8 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 class FusionWebSocketManager(
-    private val wsUrl: String = "ws://10.0.2.2:8001/ws/stream"
+    private val wsUrl: String,
+    private val accessTokenProvider: () -> String?
 ) {
     private val TAG = "FusionWebSocketManager"
     private var client: OkHttpClient? = null
@@ -51,6 +52,11 @@ class FusionWebSocketManager(
         val scopedUrl = "$wsUrl${if (wsUrl.contains("?")) "&" else "?"}session_id=$encodedSessionId"
         val request = Request.Builder()
             .url(scopedUrl)
+            .apply {
+                accessTokenProvider()?.takeIf { it.isNotBlank() }?.let {
+                    header("Authorization", "Bearer $it")
+                }
+            }
             .build()
 
         webSocket = client?.newWebSocket(request, object : WebSocketListener() {

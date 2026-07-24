@@ -10,7 +10,6 @@ data class EventEntity(
     val deviceId: String,
     val eventType: String,
     val amount: Double,
-    val compositeTrust: Float,
     val timestamp: Long = System.currentTimeMillis(),
     val status: String = "PENDING"
 )

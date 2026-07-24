@@ -7,34 +7,9 @@ export default function Neo4jGraphStudio({ graphData, onNodeClick }) {
   const [selectedNode, setSelectedNode] = useState(null);
   const [highlightMule, setHighlightMule] = useState(true);
 
-  // Default graph structure if empty
-  const defaultGraph = {
-    nodes: [
-      { id: 'usr_abc', group: 'user', name: 'User: usr_abc', val: 25, color: '#3B82F6', pagerank: '0.0042', betweenness: '0.012' },
-      { id: 'ACC_ABC_123', group: 'account', name: 'Account: ACC_ABC_123', val: 20, color: '#06B6D4', pagerank: '0.0081', betweenness: '0.025' },
-      { id: 'ACC_MULE_NEW', group: 'account', name: 'Mule Target: ACC_MULE_NEW', val: 30, color: '#EF4444', isMule: true, pagerank: '0.0450', betweenness: '0.120' },
-      { id: '185.15.2.22', group: 'ip', name: 'IP: 185.15.2.22', val: 18, color: '#F59E0B', pagerank: '0.0015', betweenness: '0.004' },
-      { id: 'dev_9999', group: 'device', name: 'Device: dev_9999', val: 18, color: '#8B5CF6', pagerank: '0.0021', betweenness: '0.006' },
-      { id: 'cluster_alpha', group: 'mule_ring', name: 'Mule Cluster Alpha (6 Accounts)', val: 35, color: '#DC2626', isMule: true, pagerank: '0.0920', betweenness: '0.340' },
-      { id: 'mule_acc_1', group: 'account', name: 'Mule: mule_acc_1', val: 12, color: '#EF4444', isMule: true },
-      { id: 'mule_acc_2', group: 'account', name: 'Mule: mule_acc_2', val: 12, color: '#EF4444', isMule: true },
-      { id: 'mule_acc_3', group: 'account', name: 'Mule: mule_acc_3', val: 12, color: '#EF4444', isMule: true },
-    ],
-    links: [
-      { source: 'usr_abc', target: 'ACC_ABC_123', label: 'owns_account' },
-      { source: 'usr_abc', target: '185.15.2.22', label: 'login_ip' },
-      { source: 'usr_abc', target: 'dev_9999', label: 'device_used' },
-      { source: 'ACC_ABC_123', target: 'ACC_MULE_NEW', label: 'INR 7.5L Transfer' },
-      { source: 'ACC_MULE_NEW', target: 'cluster_alpha', label: 'belongs_to' },
-      { source: 'cluster_alpha', target: 'mule_acc_1', label: 'ring_member' },
-      { source: 'cluster_alpha', target: 'mule_acc_2', label: 'ring_member' },
-      { source: 'cluster_alpha', target: 'mule_acc_3', label: 'ring_member' },
-    ]
-  };
-
   const activeData = (graphData && graphData.nodes && graphData.nodes.length > 0)
     ? graphData
-    : defaultGraph;
+    : { nodes: [], links: [] };
 
   const handleNodeClick = (node) => {
     setSelectedNode(node);

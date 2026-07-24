@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { authenticatedWebSocketUrl } from '../platformAuth';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, Radio, RefreshCw, Upload, Terminal, Landmark, User, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -19,7 +20,7 @@ import CSVSchemaMapperModal from '../components/runtime/CSVSchemaMapperModal';
 import SessionTrustPassportPanel from '../components/trust/SessionTrustPassportPanel';
 import InvestigationIntelligencePanel from '../components/investigation/InvestigationIntelligencePanel';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid');
 const WS_BASE = API_BASE.replace(/^http/, 'ws');
 
 export default function OperationsCenterPage() {
@@ -64,7 +65,7 @@ export default function OperationsCenterPage() {
 
   const connectWebSocket = () => {
     if (wsRef.current) wsRef.current.close();
-    wsRef.current = new WebSocket(`${WS_BASE}/ws/stream`);
+    wsRef.current = new WebSocket(authenticatedWebSocketUrl(`${WS_BASE}/ws/stream`));
 
     wsRef.current.onopen = () => setWsConnected(true);
     wsRef.current.onclose = () => setWsConnected(false);

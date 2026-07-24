@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { authenticatedWebSocketUrl } from '../../platformAuth';
 import { Clock3, RefreshCw, Search, ShieldCheck, Wifi, WifiOff } from 'lucide-react';
 import Card from '../common/Card';
 import TrustComponentHeatmap from './TrustComponentHeatmap';
 import TrustPassportCard from './TrustPassportCard';
 import TrustTimelineChart from './TrustTimelineChart';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid');
 const WS_BASE = (import.meta.env.VITE_WS_BASE || API_BASE).replace(/^http/, 'ws');
 
 export default function SessionIntelligenceDashboard() {
@@ -80,7 +81,7 @@ export default function SessionIntelligenceDashboard() {
 
     const connect = () => {
       setConnectionState('CONNECTING');
-      socket = new WebSocket(`${WS_BASE}/ws/stream?session_id=${encodeURIComponent(selectedId)}`);
+      socket = new WebSocket(authenticatedWebSocketUrl(`${WS_BASE}/ws/stream?session_id=${encodeURIComponent(selectedId)}`));
       socket.onopen = () => setConnectionState('LIVE');
       socket.onmessage = (message) => {
         const envelope = JSON.parse(message.data);

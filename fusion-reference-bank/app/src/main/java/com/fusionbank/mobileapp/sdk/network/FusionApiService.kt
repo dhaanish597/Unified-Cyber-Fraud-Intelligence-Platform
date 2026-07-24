@@ -9,6 +9,10 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface FusionApiService {
+    @POST("auth/token")
+    suspend fun createAccessToken(
+        @Body request: SDKTokenRequest
+    ): Response<SDKTokenResponse>
 
     @POST("sdk/session/start")
     suspend fun startSession(

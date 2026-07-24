@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, DollarSign, Clock, Smartphone, Globe, Layers, GitCommit, Sparkles, AlertTriangle, CheckCircle2, RefreshCw, Gauge } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid');
 
 export default function DigitalTwinBaseline({ userId = 'usr_abc' }) {
   const [twinData, setTwinData] = useState(null);

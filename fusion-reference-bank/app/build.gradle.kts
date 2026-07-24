@@ -21,23 +21,44 @@ android {
             useSupportLibrary = true
         }
 
-        buildConfigField("String", "FUSION_BASE_URL", "\"http://10.0.2.2:8001/\"")
-        buildConfigField("String", "FUSION_WS_URL", "\"ws://10.0.2.2:8001/ws/stream\"")
         buildConfigField("String", "SDK_VERSION", "\"FAT-SDK v2.4.1\"")
         buildConfigField("String", "TENANT_ID", "\"TENANT_FUSB_001\"")
     }
 
+    val releaseStoreFile = providers.gradleProperty("FUSION_RELEASE_STORE_FILE").orNull
+    val releaseStorePassword = providers.gradleProperty("FUSION_RELEASE_STORE_PASSWORD").orNull
+    val releaseKeyAlias = providers.gradleProperty("FUSION_RELEASE_KEY_ALIAS").orNull
+    val releaseKeyPassword = providers.gradleProperty("FUSION_RELEASE_KEY_PASSWORD").orNull
+    signingConfigs {
+        if (listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword).all { !it.isNullOrBlank() }) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            buildConfigField("String", "FUSION_BASE_URL", "\"https://fusion.example.invalid/\"")
+            buildConfigField("String", "FUSION_WS_URL", "\"wss://fusion.example.invalid/ws/stream\"")
+            buildConfigField("String", "FUSION_DEV_CLIENT_ID", "\"\"")
+            buildConfigField("String", "FUSION_DEV_CLIENT_SECRET", "\"\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
         debug {
+            buildConfigField("String", "FUSION_BASE_URL", "\"http://10.0.2.2:8001/\"")
+            buildConfigField("String", "FUSION_WS_URL", "\"ws://10.0.2.2:8001/ws/stream\"")
+            buildConfigField("String", "FUSION_DEV_CLIENT_ID", "\"fusion-android-dev\"")
+            buildConfigField("String", "FUSION_DEV_CLIENT_SECRET", "\"fusion-android-local-only\"")
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
             isDebuggable = true
@@ -105,6 +126,7 @@ dependencies {
 
     // Security & Coroutines
     implementation(libs.security.crypto)
+    implementation("com.google.errorprone:error_prone_annotations:2.26.1")
     implementation(libs.kotlinx.coroutines.android)
 
     // Debugging / Testing

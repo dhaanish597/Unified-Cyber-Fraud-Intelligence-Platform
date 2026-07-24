@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { authenticatedWebSocketUrl } from '../../platformAuth';
 import { 
   ShieldAlert, 
   User, 
@@ -48,7 +49,7 @@ import InvestigationIntelligencePanel from './InvestigationIntelligencePanel';
 import QuantumTrustPanel from '../quantum/QuantumTrustPanel';
 
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid');
 
 
 const WS_BASE = API_BASE.replace(/^http/, 'ws');
@@ -80,7 +81,7 @@ export default function InvestigationWorkbench({ caseId = 'CASE-2026-8942' }) {
     setIsPlaying(true);
 
     if (wsRef.current) wsRef.current.close();
-    wsRef.current = new WebSocket(`${WS_BASE}/ws/stream`);
+    wsRef.current = new WebSocket(authenticatedWebSocketUrl(`${WS_BASE}/ws/stream`));
 
     wsRef.current.onmessage = async (evt) => {
       try {

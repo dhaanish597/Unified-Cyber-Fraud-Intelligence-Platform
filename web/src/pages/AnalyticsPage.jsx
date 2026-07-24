@@ -37,7 +37,7 @@ export default function AnalyticsPage() {
   const [selectedConfig, setSelectedConfig] = useState('full_fusion');
 
   useEffect(() => {
-    fetch('http://localhost:8001/metrics/evaluate')
+    fetch(`${import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid')}/metrics/evaluate`)
       .then(r => r.json())
       .then(data => {
         if (data.error) setEvalError(true);
@@ -47,7 +47,7 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
-    fetch(`http://localhost:8001/metrics/cost?fn_cost=${fnCost}&fp_cost=${fpCost}`)
+    fetch(`${import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid')}/metrics/cost?fn_cost=${fnCost}&fp_cost=${fpCost}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) setSweepError(true);

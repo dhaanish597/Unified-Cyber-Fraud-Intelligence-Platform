@@ -17,7 +17,10 @@ class FusionBankApp : Application() {
                 wsUrl = BuildConfig.FUSION_WS_URL,
                 appId = "com.fusionbank.mobileapp",
                 tenantId = BuildConfig.TENANT_ID,
-                sdkVersion = BuildConfig.SDK_VERSION
+                sdkVersion = BuildConfig.SDK_VERSION,
+                environment = if (BuildConfig.DEBUG) "DEVELOPMENT" else "PRODUCTION",
+                developmentClientId = BuildConfig.FUSION_DEV_CLIENT_ID.ifBlank { null },
+                developmentClientSecret = BuildConfig.FUSION_DEV_CLIENT_SECRET.ifBlank { null }
             )
         )
     }

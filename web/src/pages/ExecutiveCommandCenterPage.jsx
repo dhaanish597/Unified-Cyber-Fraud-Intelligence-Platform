@@ -3,7 +3,7 @@ import { DollarSign, ShieldAlert, Cpu, Activity, TrendingUp, CheckCircle2, FileC
 import MetricCard from '../components/common/MetricCard';
 import PageContainer from '../components/layout/PageContainer';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid');
 
 export default function ExecutiveCommandCenterPage() {
   const [quantumData, setQuantumData] = useState(null);

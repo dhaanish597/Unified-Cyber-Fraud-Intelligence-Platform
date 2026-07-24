@@ -32,6 +32,7 @@ object Fusion {
     private lateinit var secureStorage: SecureStorage
     private lateinit var attestationEngine: DeviceAttestationEngine
     private lateinit var queueManager: OfflineEventQueueManager
+    @Volatile private var accessToken: String? = null
 
     private val _activeSession = MutableStateFlow<SDKSessionResponse?>(null)
     val activeSession: StateFlow<SDKSessionResponse?> = _activeSession.asStateFlow()
@@ -54,6 +55,7 @@ object Fusion {
     fun initialize(context: Context, customConfig: FusionConfig = FusionConfig()) {
         if (isInitialized) return
         config = customConfig
+        accessToken = customConfig.accessToken
 
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
@@ -63,6 +65,14 @@ object Fusion {
             }
         }
         val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder().apply {
+                    accessToken?.takeIf { it.isNotBlank() }?.let {
+                        header("Authorization", "Bearer $it")
+                    }
+                }.build()
+                chain.proceed(request)
+            }
             .addInterceptor(logging)
             .build()
 
@@ -73,7 +83,7 @@ object Fusion {
             .build()
 
         apiService = retrofit.create(FusionApiService::class.java)
-        webSocketManager = FusionWebSocketManager(config.wsUrl)
+        webSocketManager = FusionWebSocketManager(config.wsUrl) { accessToken }
         secureStorage = SecureStorage(context)
         attestationEngine = DeviceAttestationEngine(context)
 
@@ -119,6 +129,7 @@ object Fusion {
             }
 
             try {
+                ensureAccessToken()
                 // Register Device
                 val deviceReq = attestationEngine.generateDeviceProfile(deviceId)
                 apiService.registerDevice(deviceReq)
@@ -171,16 +182,22 @@ object Fusion {
     ) {
         checkInitialized()
         val session = _activeSession.value
-        val sessionId = session?.sessionId ?: secureStorage.getString(SecureStorage.KEY_SESSION_ID) ?: "SDK_SESS_DEMO"
-        val deviceId = session?.deviceId ?: secureStorage.getString(SecureStorage.KEY_DEVICE_ID) ?: "DEV_DEMO"
-        val trust = session?.compositeTrustScore ?: 82.0f
+        val sessionId = session?.sessionId ?: secureStorage.getString(SecureStorage.KEY_SESSION_ID)
+        if (sessionId == null) {
+            onResult?.invoke(Result.failure(IllegalStateException("No active Fusion session")))
+            return
+        }
+        val deviceId = session?.deviceId ?: secureStorage.getString(SecureStorage.KEY_DEVICE_ID)
+        if (deviceId == null) {
+            onResult?.invoke(Result.failure(IllegalStateException("No registered Fusion device")))
+            return
+        }
 
         val request = SDKEventRequest(
             sessionId = sessionId,
             deviceId = deviceId,
             eventType = eventType,
             amount = amount,
-            compositeTrust = trust,
             sdkVersion = config.sdkVersion
         )
 
@@ -224,17 +241,15 @@ object Fusion {
     ) {
         checkInitialized()
         val session = _activeSession.value
-        val sessionId = session?.sessionId ?: secureStorage.getString(SecureStorage.KEY_SESSION_ID) ?: "SDK_SESS_DEMO"
-        val trust = session?.compositeTrustScore ?: 82.0f
+        val sessionId = session?.sessionId ?: secureStorage.getString(SecureStorage.KEY_SESSION_ID)
+            ?: return onResult(Result.failure(IllegalStateException("No active Fusion session")))
 
         val request = SDKDecisionRequest(
             sessionId = sessionId,
             eventType = eventType,
             amount = amount,
-            compositeTrust = trust,
             vpnDetected = false,
-            rootDetected = false,
-            runtimeTrust = 94.0f
+            rootDetected = false
         )
 
         scope.launch {
@@ -263,7 +278,8 @@ object Fusion {
 
     fun getTrustPassport(onResult: (Result<SDKTrustPassportResponse>) -> Unit) {
         checkInitialized()
-        val sessionId = _activeSession.value?.sessionId ?: secureStorage.getString(SecureStorage.KEY_SESSION_ID) ?: "SDK_SESS_DEMO"
+        val sessionId = _activeSession.value?.sessionId ?: secureStorage.getString(SecureStorage.KEY_SESSION_ID)
+            ?: return onResult(Result.failure(IllegalStateException("No active Fusion session")))
         scope.launch {
             try {
                 val response = apiService.getTrustPassport(sessionId)
@@ -318,6 +334,29 @@ object Fusion {
     fun shutdown() {
         endSession()
         isInitialized = false
+    }
+
+    fun setAccessToken(token: String) {
+        require(token.isNotBlank()) { "Access token must not be blank" }
+        accessToken = token
+    }
+
+    private suspend fun ensureAccessToken() {
+        if (!accessToken.isNullOrBlank()) return
+        val clientId = config.developmentClientId
+        val clientSecret = config.developmentClientSecret
+        if (clientId.isNullOrBlank() || clientSecret.isNullOrBlank()) {
+            throw IllegalStateException(
+                "No platform access token. The host application must call Fusion.setAccessToken()."
+            )
+        }
+        check(BuildConfig.DEBUG) {
+            "Embedded client credentials are forbidden in production builds"
+        }
+        val response = apiService.createAccessToken(SDKTokenRequest(clientId, clientSecret))
+        accessToken = response.body()?.accessToken
+            ?.takeIf { response.isSuccessful && it.isNotBlank() }
+            ?: throw IllegalStateException("Development authentication failed: HTTP ${response.code()}")
     }
 
     private fun checkInitialized() {
