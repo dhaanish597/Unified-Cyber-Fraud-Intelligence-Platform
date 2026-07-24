@@ -2,12 +2,16 @@ package com.fusionbank.mobileapp.sdk.network
 
 import android.util.Log
 import com.fusionbank.mobileapp.sdk.models.FusionConnectionState
+import com.fusionbank.mobileapp.sdk.models.SDKTrustUpdateEnvelope
+import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.*
 import java.util.concurrent.TimeUnit
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 class FusionWebSocketManager(
     private val wsUrl: String = "ws://10.0.2.2:8001/ws/stream"
@@ -22,13 +26,19 @@ class FusionWebSocketManager(
     private val _lastMessage = MutableStateFlow<String?>(null)
     val lastMessage: StateFlow<String?> = _lastMessage.asStateFlow()
 
+    private val _trustUpdates = MutableStateFlow<SDKTrustUpdateEnvelope?>(null)
+    val trustUpdates: StateFlow<SDKTrustUpdateEnvelope?> = _trustUpdates.asStateFlow()
+
     private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var reconnectAttempt = 0
     private var isIntentionallyClosed = false
+    private var activeSessionId: String? = null
+    private val gson = Gson()
 
-    fun connect() {
+    fun connect(sessionId: String) {
         if (_connectionState.value == FusionConnectionState.CONNECTED) return
 
+        activeSessionId = sessionId
         isIntentionallyClosed = false
         _connectionState.value = FusionConnectionState.SYNCING
 
@@ -37,8 +47,10 @@ class FusionWebSocketManager(
             .pingInterval(10, TimeUnit.SECONDS)
             .build()
 
+        val encodedSessionId = URLEncoder.encode(sessionId, StandardCharsets.UTF_8.toString())
+        val scopedUrl = "$wsUrl${if (wsUrl.contains("?")) "&" else "?"}session_id=$encodedSessionId"
         val request = Request.Builder()
-            .url(wsUrl)
+            .url(scopedUrl)
             .build()
 
         webSocket = client?.newWebSocket(request, object : WebSocketListener() {
@@ -50,6 +62,14 @@ class FusionWebSocketManager(
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 _lastMessage.value = text
+                try {
+                    val update = gson.fromJson(text, SDKTrustUpdateEnvelope::class.java)
+                    if (update.messageType == "trust_passport_update") {
+                        _trustUpdates.value = update
+                    }
+                } catch (exception: Exception) {
+                    Log.w(TAG, "Ignored unsupported WebSocket frame: ${exception.message}")
+                }
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -85,7 +105,7 @@ class FusionWebSocketManager(
         scope.launch {
             delay(delayMs)
             if (!isIntentionallyClosed && _connectionState.value != FusionConnectionState.CONNECTED) {
-                connect()
+                activeSessionId?.let(::connect)
             }
         }
     }
@@ -94,6 +114,7 @@ class FusionWebSocketManager(
         isIntentionallyClosed = true
         webSocket?.close(1000, "Client initiated disconnect")
         webSocket = null
+        activeSessionId = null
         _connectionState.value = FusionConnectionState.DISCONNECTED
     }
 }

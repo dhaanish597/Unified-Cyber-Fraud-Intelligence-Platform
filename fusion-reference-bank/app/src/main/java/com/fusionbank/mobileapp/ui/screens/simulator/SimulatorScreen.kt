@@ -25,6 +25,7 @@ import com.fusionbank.mobileapp.sdk.Fusion
 import com.fusionbank.mobileapp.sdk.models.FusionConnectionState
 import com.fusionbank.mobileapp.ui.components.LiveStatusCard
 import com.fusionbank.mobileapp.ui.theme.*
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -65,7 +65,7 @@ fun DashboardScreen(
                 .padding(padding)
         ) {
             // Persistent Live Fusion Risk OS Status Card
-            LiveStatusCard()
+            LiveStatusCard(onOpenTrustPassport = { onNavigate("trust_passport") })
 
             LazyColumn(
                 modifier = Modifier

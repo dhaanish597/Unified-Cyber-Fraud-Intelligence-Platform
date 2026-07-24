@@ -27,7 +27,8 @@ import com.fusionbank.mobileapp.ui.theme.*
 @Composable
 fun LiveStatusCard(
     modifier: Modifier = Modifier,
-    onOpenSimulator: (() -> Unit)? = null
+    onOpenSimulator: (() -> Unit)? = null,
+    onOpenTrustPassport: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val connectionState by Fusion.connectionState.collectAsState()
@@ -44,8 +45,8 @@ fun LiveStatusCard(
     }
 
     val sessionId = activeSession?.sessionId ?: "SDK_SESS_INACTIVE"
-    val trustScore = trustPassport?.compositeTrust ?: activeSession?.compositeTrustScore ?: 82.0f
-    val policyVersion = activeSession?.policyVersion ?: "v1.0.3"
+    val trustScore = trustPassport?.overallTrust ?: activeSession?.compositeTrustScore ?: 82.0f
+    val policyVersion = trustPassport?.version ?: activeSession?.policyVersion ?: "v1.0.3"
 
     Card(
         modifier = modifier
@@ -155,6 +156,16 @@ fun LiveStatusCard(
                 Column(horizontalAlignment = Alignment.End) {
                     Text("LATENCY / SYNC", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, fontSize = 9.sp)
                     Text("${latencyMs.toInt()}ms • Live", style = MaterialTheme.typography.labelSmall, color = TextPrimaryDark, fontSize = 11.sp)
+                }
+            }
+
+            if (onOpenTrustPassport != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                TextButton(
+                    onClick = onOpenTrustPassport,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("View Trust Passport", color = AccentCyan, fontSize = 11.sp)
                 }
             }
         }

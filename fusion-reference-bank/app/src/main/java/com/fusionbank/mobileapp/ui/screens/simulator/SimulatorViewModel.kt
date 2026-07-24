@@ -98,15 +98,16 @@ class SimulatorViewModel @Inject constructor() : ViewModel() {
     }
 
     fun triggerEvent(eventName: String, amount: Double = 0.0, category: String = "SIMULATION") {
-        viewModelScope.launch {
-            val t0 = System.currentTimeMillis()
-            Fusion.reportEvent(eventName, amount)
+        val t0 = System.currentTimeMillis()
+        Fusion.reportEvent(eventName, amount) { result ->
             val latency = System.currentTimeMillis() - t0
-
-            addLog(eventName, category, "ACK 200", latency, "Event reported to Fusion SDK & Backend")
-            addDevLog("[SDK -> POST /sdk/event] event_type=$eventName, amount=$amount, latency=${latency}ms")
-
-            refreshPassport()
+            result.onSuccess { acknowledgement ->
+                addLog(eventName, category, "ACK 200", latency, "Backend event ${acknowledgement.eventId}")
+                addDevLog("[Backend ACK] event_id=${acknowledgement.eventId}, event_type=$eventName, latency=${acknowledgement.ingestionLatencyMs}ms")
+            }.onFailure { exception ->
+                addLog(eventName, category, "QUEUED", latency, exception.message ?: "Delivery failed")
+                addDevLog("[SDK QUEUE] event_type=$eventName, reason=${exception.message}")
+            }
         }
     }
 
@@ -160,7 +161,7 @@ class SimulatorViewModel @Inject constructor() : ViewModel() {
     fun refreshPassport() {
         Fusion.getTrustPassport { result ->
             result.onSuccess { passport ->
-                addDevLog("[Backend -> Passport] Composite Trust: ${passport.compositeTrust}, Policy Version: ${passport.policyVersion}")
+                addDevLog("[Backend -> Passport] Overall Trust: ${passport.overallTrust}, Version: ${passport.version}")
             }
         }
     }

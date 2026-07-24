@@ -15,6 +15,7 @@ import com.fusionbank.mobileapp.ui.screens.qr.QrPaymentScreen
 import com.fusionbank.mobileapp.ui.screens.simulator.SimulatorScreen
 import com.fusionbank.mobileapp.ui.screens.splash.SplashScreen
 import com.fusionbank.mobileapp.ui.screens.transfer.TransferScreen
+import com.fusionbank.mobileapp.ui.screens.trust.TrustPassportScreen
 
 object Destinations {
     const val SPLASH = "splash"
@@ -27,6 +28,7 @@ object Destinations {
     const val BILL_PAYMENT = "bill_payment"
     const val PROFILE = "profile"
     const val SIMULATOR = "simulator"
+    const val TRUST_PASSPORT = "trust_passport"
 }
 
 @Composable
@@ -109,6 +111,12 @@ fun NavGraph(
 
         composable(Destinations.SIMULATOR) {
             SimulatorScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Destinations.TRUST_PASSPORT) {
+            TrustPassportScreen(
                 onBack = { navController.popBackStack() }
             )
         }

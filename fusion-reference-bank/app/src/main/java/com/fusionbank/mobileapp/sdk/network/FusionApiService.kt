@@ -4,6 +4,7 @@ import com.fusionbank.mobileapp.sdk.models.*
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.POST
 import retrofit2.http.Query
 
@@ -41,6 +42,12 @@ interface FusionApiService {
     suspend fun getTrustPassport(
         @Query("session_id") sessionId: String
     ): Response<SDKTrustPassportResponse>
+
+    @GET("trust-history/{sessionId}")
+    suspend fun getTrustHistory(
+        @Path("sessionId") sessionId: String,
+        @Query("range") range: String = "last_hour"
+    ): Response<SDKTrustHistoryResponse>
 
     @GET("sdk/health")
     suspend fun getHealth(): Response<SDKHealthResponse>

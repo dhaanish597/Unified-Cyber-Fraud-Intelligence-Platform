@@ -127,14 +127,79 @@ data class SDKPolicy(
 
 data class SDKTrustPassportResponse(
     @SerializedName("session_id") val sessionId: String,
-    @SerializedName("composite_trust") val compositeTrust: Float,
-    @SerializedName("device_trust") val deviceTrust: Float,
-    @SerializedName("session_trust") val sessionTrust: Float,
-    @SerializedName("behaviour_trust") val behaviourTrust: Float,
-    @SerializedName("network_trust") val networkTrust: Float,
-    @SerializedName("runtime_trust") val runtimeTrust: Float,
-    @SerializedName("policy_version") val policyVersion: String,
-    @SerializedName("sync_timestamp") val syncTimestamp: String
+    @SerializedName("passport_id") val passportId: String = "",
+    @SerializedName("user_id") val userId: String = "",
+    @SerializedName("identity_trust") val identityTrust: Float = 0f,
+    @SerializedName("device_trust") val deviceTrust: Float = 0f,
+    @SerializedName("runtime_trust") val runtimeTrust: Float = 0f,
+    @SerializedName("behaviour_trust") val behaviourTrust: Float = 0f,
+    @SerializedName("network_trust") val networkTrust: Float = 0f,
+    @SerializedName("geo_trust") val geoTrust: Float = 0f,
+    @SerializedName("threat_trust") val threatTrust: Float = 0f,
+    @SerializedName("graph_trust") val graphTrust: Float = 0f,
+    @SerializedName("transaction_trust") val transactionTrust: Float = 0f,
+    @SerializedName("overall_trust") val overallTrust: Float = 0f,
+    @SerializedName("confidence") val confidence: Float = 0f,
+    @SerializedName("current_status") val currentStatus: String = "ACTIVE",
+    @SerializedName("created_time") val createdTime: String = "",
+    @SerializedName("updated_time") val updatedTime: String = "",
+    @SerializedName("version") val version: String = "",
+    @SerializedName("trust_trend") val trustTrend: String = "STABLE",
+    @SerializedName("components") val components: Map<String, SDKTrustComponent> = emptyMap(),
+    @SerializedName("composite_trust") val compositeTrust: Float = overallTrust,
+    @SerializedName("session_trust") val sessionTrust: Float = overallTrust,
+    @SerializedName("policy_version") val policyVersion: String = version,
+    @SerializedName("sync_timestamp") val syncTimestamp: String = updatedTime
+)
+
+data class SDKTrustComponent(
+    @SerializedName("name") val name: String,
+    @SerializedName("value") val value: Float,
+    @SerializedName("confidence") val confidence: Float,
+    @SerializedName("previous_value") val previousValue: Float,
+    @SerializedName("difference") val difference: Float,
+    @SerializedName("trend") val trend: String,
+    @SerializedName("reasons") val reasons: List<String> = emptyList(),
+    @SerializedName("updated_at") val updatedAt: String = ""
+)
+
+data class SDKTrustDelta(
+    @SerializedName("delta_id") val deltaId: String,
+    @SerializedName("timestamp") val timestamp: String,
+    @SerializedName("event_type") val eventType: String,
+    @SerializedName("component") val component: String,
+    @SerializedName("previous_trust") val previousTrust: Float,
+    @SerializedName("current_trust") val currentTrust: Float,
+    @SerializedName("difference") val difference: Float,
+    @SerializedName("reason") val reason: String,
+    @SerializedName("is_recovery") val isRecovery: Boolean = false
+)
+
+data class SDKTrustSnapshot(
+    @SerializedName("snapshot_id") val snapshotId: String,
+    @SerializedName("timestamp") val timestamp: String,
+    @SerializedName("event_type") val eventType: String,
+    @SerializedName("previous_trust") val previousTrust: Float,
+    @SerializedName("current_trust") val currentTrust: Float,
+    @SerializedName("delta") val delta: Float,
+    @SerializedName("reason") val reason: String
+)
+
+data class SDKTrustHistoryResponse(
+    @SerializedName("session_id") val sessionId: String,
+    @SerializedName("range") val range: String,
+    @SerializedName("snapshots") val snapshots: List<SDKTrustSnapshot>,
+    @SerializedName("count") val count: Int
+)
+
+data class SDKTrustUpdateEnvelope(
+    @SerializedName("msg_type") val messageType: String,
+    @SerializedName("session_id") val sessionId: String,
+    @SerializedName("event_type") val eventType: String,
+    @SerializedName("passport") val passport: SDKTrustPassportResponse,
+    @SerializedName("deltas") val deltas: List<SDKTrustDelta> = emptyList(),
+    @SerializedName("snapshot") val snapshot: SDKTrustSnapshot? = null,
+    @SerializedName("processing_time_ms") val processingTimeMs: Float = 0f
 )
 
 data class SDKHealthResponse(

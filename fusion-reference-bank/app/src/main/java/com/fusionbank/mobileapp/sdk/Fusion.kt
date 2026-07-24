@@ -2,6 +2,7 @@ package com.fusionbank.mobileapp.sdk
 
 import android.content.Context
 import android.util.Log
+import com.fusionbank.mobileapp.BuildConfig
 import com.fusionbank.mobileapp.sdk.models.*
 import com.fusionbank.mobileapp.sdk.network.FusionApiService
 import com.fusionbank.mobileapp.sdk.network.FusionWebSocketManager
@@ -38,6 +39,12 @@ object Fusion {
     private val _trustPassport = MutableStateFlow<SDKTrustPassportResponse?>(null)
     val trustPassport: StateFlow<SDKTrustPassportResponse?> = _trustPassport.asStateFlow()
 
+    private val _trustHistory = MutableStateFlow<List<SDKTrustSnapshot>>(emptyList())
+    val trustHistory: StateFlow<List<SDKTrustSnapshot>> = _trustHistory.asStateFlow()
+
+    private val _trustDeltas = MutableStateFlow<List<SDKTrustDelta>>(emptyList())
+    val trustDeltas: StateFlow<List<SDKTrustDelta>> = _trustDeltas.asStateFlow()
+
     private val _connectionState = MutableStateFlow(FusionConnectionState.DISCONNECTED)
     val connectionState: StateFlow<FusionConnectionState> = _connectionState.asStateFlow()
 
@@ -49,7 +56,11 @@ object Fusion {
         config = customConfig
 
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor(logging)
@@ -75,6 +86,20 @@ object Fusion {
                 _connectionState.value = state
                 if (state == FusionConnectionState.CONNECTED) {
                     queueManager.flushQueue()
+                }
+            }
+        }
+
+        scope.launch {
+            webSocketManager.trustUpdates.collect { update ->
+                if (update == null) return@collect
+                _trustPassport.value = update.passport
+                _sdkLatencyMs.value = update.processingTimeMs
+                update.snapshot?.let { snapshot ->
+                    _trustHistory.value = (_trustHistory.value + snapshot).takeLast(500)
+                }
+                if (update.deltas.isNotEmpty()) {
+                    _trustDeltas.value = (update.deltas + _trustDeltas.value).take(200)
                 }
             }
         }
@@ -116,7 +141,8 @@ object Fusion {
                     _sdkLatencyMs.value = (System.currentTimeMillis() - t0).toFloat()
 
                     // Connect WebSocket
-                    webSocketManager.connect()
+                    webSocketManager.connect(session.sessionId)
+                    refreshTrustHistory()
 
                     // Report initial SESSION_STARTED event
                     reportEvent("SESSION_STARTED")
@@ -138,7 +164,11 @@ object Fusion {
         }
     }
 
-    fun reportEvent(eventType: String, amount: Double = 0.0) {
+    fun reportEvent(
+        eventType: String,
+        amount: Double = 0.0,
+        onResult: ((Result<SDKEventResponse>) -> Unit)? = null
+    ) {
         checkInitialized()
         val session = _activeSession.value
         val sessionId = session?.sessionId ?: secureStorage.getString(SecureStorage.KEY_SESSION_ID) ?: "SDK_SESS_DEMO"
@@ -159,17 +189,34 @@ object Fusion {
             try {
                 if (_connectionState.value == FusionConnectionState.DISCONNECTED) {
                     queueManager.enqueueEvent(request)
+                    withContext(Dispatchers.Main) {
+                        onResult?.invoke(Result.failure(Exception("Event queued for offline retry")))
+                    }
                 } else {
                     val response = apiService.reportEvent(request)
                     if (!response.isSuccessful) {
                         queueManager.enqueueEvent(request)
+                        withContext(Dispatchers.Main) {
+                            onResult?.invoke(Result.failure(Exception("Event rejected: HTTP ${response.code()}")))
+                        }
                     } else {
                         _sdkLatencyMs.value = (System.currentTimeMillis() - t0).toFloat()
+                        val acknowledgement = response.body()
+                        withContext(Dispatchers.Main) {
+                            if (acknowledgement != null) {
+                                onResult?.invoke(Result.success(acknowledgement))
+                            } else {
+                                onResult?.invoke(Result.failure(Exception("Empty event acknowledgement")))
+                            }
+                        }
                     }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Network error during reportEvent, queuing offline: ${e.message}")
                 queueManager.enqueueEvent(request)
+                withContext(Dispatchers.Main) {
+                    onResult?.invoke(Result.failure(e))
+                }
             }
         }
     }
@@ -243,12 +290,31 @@ object Fusion {
         }
     }
 
+    fun refreshTrustHistory(range: String = "last_hour") {
+        checkInitialized()
+        val sessionId = _activeSession.value?.sessionId
+            ?: secureStorage.getString(SecureStorage.KEY_SESSION_ID)
+            ?: return
+        scope.launch {
+            try {
+                val response = apiService.getTrustHistory(sessionId, range)
+                if (response.isSuccessful) {
+                    _trustHistory.value = response.body()?.snapshots.orEmpty()
+                }
+            } catch (exception: Exception) {
+                Log.w(TAG, "Trust history synchronization failed: ${exception.message}")
+            }
+        }
+    }
+
     fun endSession() {
         if (!isInitialized) return
         reportEvent("SESSION_ENDED")
         webSocketManager.disconnect()
         _activeSession.value = null
         _trustPassport.value = null
+        _trustHistory.value = emptyList()
+        _trustDeltas.value = emptyList()
         secureStorage.clearAll()
         Log.i(TAG, "Fusion session terminated.")
     }
