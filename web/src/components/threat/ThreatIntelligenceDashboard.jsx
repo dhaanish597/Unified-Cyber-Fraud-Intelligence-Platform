@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { authenticatedWebSocketUrl } from '../../platformAuth';
 import { 
   ShieldAlert, 
   Search, 
@@ -23,6 +24,7 @@ import {
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8001' : 'https://fusion.example.invalid');
+const WS_BASE = API_BASE.replace(/^http/, 'ws');
 
 export default function ThreatIntelligenceDashboard() {
   const [threats, setThreats] = useState([]);
@@ -32,6 +34,7 @@ export default function ThreatIntelligenceDashboard() {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [activeThreatDetail, setActiveThreatDetail] = useState(null);
+  const [streamConnected, setStreamConnected] = useState(false);
 
   const fetchThreats = async () => {
     try {
@@ -49,8 +52,33 @@ export default function ThreatIntelligenceDashboard() {
 
   useEffect(() => {
     fetchThreats();
-    const interval = setInterval(fetchThreats, 3000);
-    return () => clearInterval(interval);
+    let socket;
+    let reconnectTimer;
+    let closed = false;
+    const connect = () => {
+      try {
+        socket = new WebSocket(authenticatedWebSocketUrl(`${WS_BASE}/ws/stream`));
+        socket.onopen = () => setStreamConnected(true);
+        socket.onmessage = (event) => {
+          const message = JSON.parse(event.data);
+          if (message.msg_type === 'pipeline_decision') fetchThreats();
+        };
+        socket.onclose = () => {
+          setStreamConnected(false);
+          if (!closed) reconnectTimer = setTimeout(connect, 2000);
+        };
+        socket.onerror = () => socket.close();
+      } catch {
+        setStreamConnected(false);
+        if (!closed) reconnectTimer = setTimeout(connect, 2000);
+      }
+    };
+    connect();
+    return () => {
+      closed = true;
+      clearTimeout(reconnectTimer);
+      socket?.close();
+    };
   }, []);
 
   // Filter & Search Logic
@@ -71,6 +99,18 @@ export default function ThreatIntelligenceDashboard() {
   const activeCount = threats.filter(t => t.status === 'ACTIVE').length;
   const criticalCount = threats.filter(t => t.severity === 'CRITICAL').length;
   const highCount = threats.filter(t => t.severity === 'HIGH').length;
+  const measuredLatencies = threats.map(t => Number(t.detection_latency_ms)).filter(Number.isFinite);
+  const averageLatency = measuredLatencies.length
+    ? measuredLatencies.reduce((sum, value) => sum + value, 0) / measuredLatencies.length
+    : null;
+  const measuredConfidences = threats
+    .map(t => t.confidence)
+    .filter(value => value != null)
+    .map(Number)
+    .filter(Number.isFinite);
+  const averageConfidence = measuredConfidences.length
+    ? measuredConfidences.reduce((sum, value) => sum + value, 0) / measuredConfidences.length
+    : null;
 
   const categories = [
     'ALL',
@@ -97,11 +137,11 @@ export default function ThreatIntelligenceDashboard() {
               Enterprise Cyber Threat Intelligence Engine
             </h1>
             <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400 font-bold border border-rose-500/30">
-              PHASE 2 LIVE
+              {streamConnected ? 'LIVE' : 'RECONNECTING'}
             </span>
           </div>
           <p className="text-soc-muted text-[11px] mt-1">
-            Realtime 9-Category Threat Taxonomy • Dynamic Confidence Engine • Multi-Stage Campaign Correlation
+            Authenticated pipeline decisions • Evidence-backed detections • Measured runtime telemetry
           </p>
         </div>
 
@@ -134,14 +174,16 @@ export default function ThreatIntelligenceDashboard() {
         <div className="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
           <div className="text-soc-dim text-[10px] uppercase font-bold">Avg Detection Latency</div>
           <div className="text-2xl font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
-            12.4 ms
+            {averageLatency == null ? 'N/A' : `${averageLatency.toFixed(2)} ms`}
             <span className="text-[10px] text-emerald-500 font-normal">&lt;100ms Target</span>
           </div>
         </div>
 
         <div className="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
           <div className="text-soc-dim text-[10px] uppercase font-bold">Engine Confidence</div>
-          <div className="text-2xl font-bold text-sky-400 mt-1">96.8% AVG</div>
+          <div className="text-2xl font-bold text-sky-400 mt-1">
+            {averageConfidence == null ? 'NOT CALIBRATED' : `${averageConfidence.toFixed(1)}%`}
+          </div>
         </div>
       </div>
 
@@ -295,7 +337,9 @@ export default function ThreatIntelligenceDashboard() {
                 </div>
                 <div className="flex justify-between items-center text-[10px] pt-1">
                   <span className="text-sky-400">Source: {t.detection_source}</span>
-                  <span className="text-emerald-400 font-mono">{t.detection_latency_ms || 12}ms</span>
+                  <span className="text-emerald-400 font-mono">
+                    {t.detection_latency_ms == null ? 'N/A' : `${t.detection_latency_ms}ms`}
+                  </span>
                 </div>
               </div>
             ))}

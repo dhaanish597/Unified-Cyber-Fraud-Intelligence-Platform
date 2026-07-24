@@ -1,0 +1,40 @@
+{
+  "measured_at_epoch": 1784871233,
+  "samples": 40,
+  "backend_http_ms": {
+    "p50": 16.357,
+    "p95": 49.007
+  },
+  "pipeline_ms": {
+    "p50": 1.839,
+    "p95": 3.835
+  },
+  "threat_ms": {
+    "p95": 0.086
+  },
+  "graph_ms": {
+    "p95": 2.239
+  },
+  "model_or_fallback_ms": {
+    "p95": 0.051
+  },
+  "broker_delivery_ms": {
+    "p95": 0.063
+  },
+  "cold_import_ms": 3133.47,
+  "cold_import_exit_code": 0,
+  "python_peak_tracemalloc_bytes": 1159775,
+  "cpu_seconds": 0.7656,
+  "wall_seconds": 0.964,
+  "cpu_to_wall_ratio": 0.7942,
+  "android_artifact_bytes": {
+    "debug_apk": 18074591,
+    "release_apk": 1820220,
+    "release_aab": 3746480
+  },
+  "notes": [
+    "Broker delivery measures server-side publish-to-subscriber queue latency.",
+    "Network reconnect and offline queue timing require an emulator/device instrumentation environment.",
+    "Memory is Python allocation peak, not operating-system RSS."
+  ]
+}

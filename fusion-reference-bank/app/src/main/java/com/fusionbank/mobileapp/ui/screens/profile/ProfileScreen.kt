@@ -37,10 +37,11 @@ fun ProfileScreen(
     val context = LocalContext.current
     val activeSession by Fusion.activeSession.collectAsState()
     val trustPassport by Fusion.trustPassport.collectAsState()
+    val bankingProfile by Fusion.bankingProfile.collectAsState()
 
     val deviceId = activeSession?.deviceId ?: "DEV_UNKNOWN"
     val sessionId = activeSession?.sessionId ?: "SDK_SESS_INACTIVE"
-    val trustScore = trustPassport?.compositeTrust ?: activeSession?.compositeTrustScore ?: 82.0f
+    val trustScore = trustPassport?.compositeTrust ?: activeSession?.compositeTrustScore
     val policyVersion = activeSession?.policyVersion ?: "v1.0.3"
 
     val scrollState = rememberScrollState()
@@ -88,6 +89,8 @@ fun ProfileScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        ProfileDetailItem("Banking User", bankingProfile?.displayName ?: "Unavailable")
+                        ProfileDetailItem("Customer ID", bankingProfile?.userId ?: "Unavailable")
                         ProfileDetailItem("Device ID", deviceId)
 
                         // Secret Long-Press on Version string triggers Demo Mode
@@ -109,7 +112,7 @@ fun ProfileScreen(
                         }
 
                         ProfileDetailItem("Session ID", sessionId)
-                        ProfileDetailItem("Trust Passport Status", "${String.format("%.1f", trustScore)} / 100")
+                        ProfileDetailItem("Trust Evidence", trustScore?.let { "${String.format("%.1f", it)} / 100" } ?: "Unavailable")
                         ProfileDetailItem("Policy Engine Version", policyVersion)
                         ProfileDetailItem("Fusion Endpoint", viewModel.endpoint)
 
@@ -143,8 +146,8 @@ fun ProfileScreen(
 
                         ProfileDetailItem("Hardware Model", "${Build.MANUFACTURER} ${Build.MODEL}")
                         ProfileDetailItem("Android Version", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-                        ProfileDetailItem("Security Patch Level", Build.VERSION.SECURITY_PATCH ?: "2026-07-01")
-                        ProfileDetailItem("Play Integrity Status", "MEETS_DEVICE_INTEGRITY")
+                        ProfileDetailItem("Security Patch Level", Build.VERSION.SECURITY_PATCH.takeIf { it.isNotBlank() } ?: "Unavailable")
+                        ProfileDetailItem("Play Integrity Status", "NOT EVALUATED")
                     }
                 }
 

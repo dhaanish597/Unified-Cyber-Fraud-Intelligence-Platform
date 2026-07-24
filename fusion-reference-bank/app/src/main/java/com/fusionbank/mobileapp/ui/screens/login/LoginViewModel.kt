@@ -13,10 +13,10 @@ import javax.inject.Inject
 @HiltViewModel
 class LoginViewModel @Inject constructor() : ViewModel() {
 
-    private val _username = MutableStateFlow("demo_user")
+    private val _username = MutableStateFlow("")
     val username: StateFlow<String> = _username.asStateFlow()
 
-    private val _password = MutableStateFlow("••••••••")
+    private val _password = MutableStateFlow("")
     val password: StateFlow<String> = _password.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
@@ -29,15 +29,15 @@ class LoginViewModel @Inject constructor() : ViewModel() {
     fun onPasswordChanged(newVal: String) { _password.value = newVal }
 
     fun login(onSuccess: () -> Unit) {
-        if (_username.value.isBlank()) {
-            _errorMessage.value = "Please enter username"
+        if (_username.value.isBlank() || _password.value.length < 8) {
+            _errorMessage.value = "Enter your username and password"
             return
         }
 
         _isLoading.value = true
         _errorMessage.value = null
 
-        Fusion.startSession(_username.value) { result ->
+        Fusion.login(_username.value, _password.value) { result ->
             _isLoading.value = false
             result.onSuccess {
                 onSuccess()

@@ -172,7 +172,7 @@ class FusionAdaptiveTrustSDKEngine:
     # MODULE 7: Event Engine
     def ingest_event(self, event: dict) -> dict:
         t0 = time.perf_counter()
-        event_id = f"EVT_{uuid.uuid4().hex[:12].upper()}"
+        event_id = event.get("event_id") or f"EVT_{uuid.uuid4().hex[:12].upper()}"
         enriched_event = {
             "event_id": event_id,
             "session_id": event.get("session_id", "SDK_SESS_DEMO"),
@@ -181,6 +181,8 @@ class FusionAdaptiveTrustSDKEngine:
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S IST"),
             "policy_triggered": self._check_policy_trigger(event),
             "sdk_version": event.get("sdk_version", "FAT-SDK v2.4.1"),
+            "request_id": event.get("request_id"),
+            "correlation_id": event.get("correlation_id"),
             "ingestion_latency_ms": round((time.perf_counter() - t0) * 1000.0, 2)
         }
         self.event_log.append(enriched_event)

@@ -129,16 +129,6 @@ fun LoginScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedButton(
-                        onClick = { viewModel.login(onLoginSuccess) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Fingerprint, contentDescription = null, tint = AccentCyan)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Use Biometric Authentication", color = TextPrimaryDark)
-                    }
                 }
             }
         }

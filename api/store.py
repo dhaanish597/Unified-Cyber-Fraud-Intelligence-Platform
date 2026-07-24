@@ -70,3 +70,13 @@ def get_raw(collection: str, key: str) -> str:
         if row:
             return row[0]
         return None
+
+def delete(collection: str, key: str) -> bool:
+    with _lock:
+        conn = get_conn()
+        with conn:
+            cursor = conn.execute(
+                "DELETE FROM store WHERE collection = ? AND key = ?",
+                (collection, str(key)),
+            )
+        return cursor.rowcount > 0

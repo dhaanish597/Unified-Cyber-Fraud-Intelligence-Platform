@@ -2,12 +2,34 @@ from __future__ import annotations
 
 import threading
 import time
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any
 
 import networkx as nx
 
 from .config import PlatformSettings, platform_settings
+
+
+ROOT = Path(__file__).resolve().parents[2]
+GRAPHSAGE_MODEL = ROOT / "graph" / "models" / "graphsage.pt"
+GRAPHSAGE_METADATA = ROOT / "graph" / "models" / "metadata.json"
+
+
+def graphsage_status() -> dict[str, Any]:
+    if not GRAPHSAGE_MODEL.exists() or not GRAPHSAGE_METADATA.exists():
+        return {
+            "status": "UNAVAILABLE",
+            "model": None,
+            "version": None,
+            "reason": "GRAPHSAGE_ARTIFACT_NOT_CONFIGURED",
+        }
+    return {
+        "status": "AVAILABLE",
+        "model": str(GRAPHSAGE_MODEL),
+        "version": GRAPHSAGE_METADATA.stat().st_mtime_ns,
+        "reason": None,
+    }
 
 
 @dataclass
@@ -35,12 +57,7 @@ class GraphResult:
     error_code: str | None = None
     graph_version: str = "graph-schema-v1"
     graphsage: dict[str, Any] = field(
-        default_factory=lambda: {
-            "status": "UNAVAILABLE",
-            "model": None,
-            "version": None,
-            "reason": "GRAPHSAGE_ARTIFACT_NOT_CONFIGURED",
-        }
+        default_factory=graphsage_status
     )
 
     def to_dict(self) -> dict[str, Any]:
@@ -195,6 +212,24 @@ class NetworkXGraphRepository:
                     )
         return findings
 
+    def topology(self, limit: int = 500) -> dict[str, Any]:
+        with self._lock:
+            nodes = [
+                {"id": str(node_id), **dict(data)}
+                for node_id, data in list(self.graph.nodes(data=True))[:limit]
+            ]
+            allowed = {node["id"] for node in nodes}
+            links = [
+                {
+                    "source": str(source),
+                    "target": str(target),
+                    **dict(data),
+                }
+                for source, target, data in self.graph.edges(data=True)
+                if str(source) in allowed and str(target) in allowed
+            ][:limit]
+        return {"nodes": nodes, "links": links}
+
 
 class Neo4jGraphRepository:
     backend_name = "NEO4J"
@@ -308,7 +343,73 @@ class Neo4jGraphRepository:
                             [{"cycle_path": row["path"]}],
                         )
                     )
+            if params["subject_id"]:
+                row = session.run(
+                    """
+                    MATCH (subject:Entity {id: $subject_id})
+                    MATCH (subject)-[:TRANSFERRED_TO*1..4]-(member:Entity)
+                    WITH collect(DISTINCT member) + subject AS members
+                    UNWIND members AS source
+                    MATCH (source)-[edge:TRANSFERRED_TO]->(target)
+                    WHERE target IN members
+                    WITH members, count(DISTINCT edge) AS edge_count
+                    WHERE size(members) >= 5 AND edge_count >= 5
+                    RETURN [member IN members | member.id] AS member_ids,
+                           edge_count
+                    LIMIT 1
+                    """,
+                    subject_id=params["subject_id"],
+                ).single()
+                if row:
+                    members = sorted(set(row["member_ids"]))
+                    findings.append(
+                        GraphFinding(
+                            "FRAUD_RING_CANDIDATE",
+                            "HIGH",
+                            members,
+                            [
+                                {
+                                    "node_count": len(members),
+                                    "transfer_edge_count": row["edge_count"],
+                                }
+                            ],
+                        )
+                    )
         return findings
+
+    def topology(self, limit: int = 500) -> dict[str, Any]:
+        with self.driver.session() as session:
+            rows = session.run(
+                """
+                MATCH (source)-[relationship]->(target)
+                RETURN coalesce(source.id, elementId(source)) AS source_id,
+                       labels(source)[0] AS source_kind,
+                       coalesce(target.id, elementId(target)) AS target_id,
+                       labels(target)[0] AS target_kind,
+                       type(relationship) AS relation,
+                       relationship.amount AS amount,
+                       relationship.transaction_id AS transaction_id
+                LIMIT $limit
+                """,
+                limit=max(1, min(limit, 2_000)),
+            )
+            node_map: dict[str, dict[str, Any]] = {}
+            links: list[dict[str, Any]] = []
+            for row in rows:
+                source = str(row["source_id"])
+                target = str(row["target_id"])
+                node_map[source] = {"id": source, "kind": row["source_kind"]}
+                node_map[target] = {"id": target, "kind": row["target_kind"]}
+                links.append(
+                    {
+                        "source": source,
+                        "target": target,
+                        "relation": row["relation"],
+                        "amount": row["amount"],
+                        "transaction_id": row["transaction_id"],
+                    }
+                )
+        return {"nodes": list(node_map.values()), "links": links}
 
 
 class GraphRuntime:
@@ -328,15 +429,16 @@ class GraphRuntime:
             self.repository = NetworkXGraphRepository()
 
     def status(self) -> dict[str, Any]:
+        try:
+            connected = self.repository.verify_connectivity()
+        except Exception:
+            connected = False
         return {
-            "status": "AVAILABLE" if self.repository.verify_connectivity() else "FAILED",
+            "status": "AVAILABLE" if connected else "FAILED",
             "backend": self.repository.backend_name,
             "neo4j_configured": bool(self.settings.neo4j_uri),
             "fallback_reason": self.error_code,
-            "graphsage": {
-                "status": "UNAVAILABLE",
-                "reason": "GRAPHSAGE_ARTIFACT_NOT_CONFIGURED",
-            },
+            "graphsage": graphsage_status(),
         }
 
     def process(self, event: dict[str, Any]) -> GraphResult:
@@ -350,6 +452,7 @@ class GraphRuntime:
                 findings=findings,
                 latency_ms=round((time.perf_counter() - started) * 1000.0, 3),
                 error_code=self.error_code,
+                graphsage=graphsage_status(),
             )
         except Exception:
             return GraphResult(
@@ -357,7 +460,34 @@ class GraphRuntime:
                 backend=self.repository.backend_name,
                 latency_ms=round((time.perf_counter() - started) * 1000.0, 3),
                 error_code="GRAPH_QUERY_FAILED",
+                graphsage=graphsage_status(),
             )
+
+    def topology(self, limit: int = 500) -> dict[str, Any]:
+        started = time.perf_counter()
+        try:
+            data = self.repository.topology(limit)
+            return {
+                "status": (
+                    "FALLBACK"
+                    if self.repository.backend_name == "NETWORKX_FALLBACK"
+                    else "EXECUTED"
+                ),
+                "backend": self.repository.backend_name,
+                "graphsage": graphsage_status(),
+                "latency_ms": round((time.perf_counter() - started) * 1000.0, 3),
+                **data,
+            }
+        except Exception:
+            return {
+                "status": "FAILED",
+                "backend": self.repository.backend_name,
+                "graphsage": graphsage_status(),
+                "latency_ms": round((time.perf_counter() - started) * 1000.0, 3),
+                "error_code": "GRAPH_TOPOLOGY_QUERY_FAILED",
+                "nodes": [],
+                "links": [],
+            }
 
 
 graph_runtime = GraphRuntime()

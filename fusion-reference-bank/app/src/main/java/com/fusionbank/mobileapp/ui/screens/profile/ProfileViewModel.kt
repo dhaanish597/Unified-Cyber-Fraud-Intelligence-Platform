@@ -16,8 +16,8 @@ class ProfileViewModel @Inject constructor() : ViewModel() {
     val sdkVersion: String = BuildConfig.SDK_VERSION
 
     fun logout(onLoggedOut: () -> Unit) {
-        // Terminates SDK session, sends SESSION_ENDED, disconnects WS, clears secure storage
-        Fusion.endSession()
-        onLoggedOut()
+        Fusion.logout {
+            onLoggedOut()
+        }
     }
 }

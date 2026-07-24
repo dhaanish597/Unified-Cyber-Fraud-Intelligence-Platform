@@ -326,11 +326,9 @@ class CyberThreatEngine:
             for evidence in observed_evidence
             if evidence.get("field") not in {"event_type", "device_id", "session_id", "user_id"}
         ]
-        confidence = 100.0 if direct_indicators else None
+        confidence = None
         confidence_explanation = (
-            f"{len(direct_indicators)} direct telemetry indicator(s) supported the rule."
-            if direct_indicators
-            else "Not available: only an event classification was supplied."
+            "Not available: deterministic rule evidence is not a calibrated probability."
         )
         
         return {
@@ -341,7 +339,7 @@ class CyberThreatEngine:
             "confidence": confidence,
             "confidence_explanation": confidence_explanation,
             "confidence_basis": {
-                "method": "OBSERVED_EVIDENCE_COVERAGE",
+                "method": "NOT_CALIBRATED",
                 "direct_indicator_count": len(direct_indicators),
                 "event_label_present": bool(event_data.get("event_type")),
             },
@@ -383,16 +381,7 @@ class CyberThreatEngine:
                 for threat in threat_objs
                 if threat["threat_category"] in {"Identity Threats", "Network Threats"}
             ]
-            measured_confidences = [
-                float(threat["confidence"])
-                for threat in inputs
-                if threat.get("confidence") is not None
-            ]
-            confidence = (
-                round(sum(measured_confidences) / len(measured_confidences), 2)
-                if measured_confidences
-                else None
-            )
+            confidence = None
             campaigns.append({
                 "threat_id": f"CAMPAIGN_{uuid.uuid4().hex[:8].upper()}",
                 "threat_name": "ACCOUNT TAKEOVER CAMPAIGN",
@@ -400,12 +389,10 @@ class CyberThreatEngine:
                 "severity": "CRITICAL",
                 "confidence": confidence,
                 "confidence_explanation": (
-                    "Arithmetic mean of correlated findings with measured confidence."
-                    if measured_confidences
-                    else "Not available: correlated findings had no measured confidence."
+                    "Not available: campaign correlation is deterministic and not calibrated."
                 ),
                 "confidence_basis": {
-                    "method": "MEAN_CORRELATED_FINDING_CONFIDENCE",
+                    "method": "NOT_CALIBRATED",
                     "input_threat_ids": [threat["threat_id"] for threat in inputs],
                 },
                 "evidence": [

@@ -21,11 +21,17 @@ PUBLIC_PATHS = {
     "/health/live",
     "/health/ready",
     "/auth/token",
+    "/banking/auth/login",
+    "/banking/auth/register",
+    "/banking/auth/refresh",
+    "/device/pair",
+    "/device/register",
     "/gateway/webhook",
 }
 
 
 ROLE_POLICIES: tuple[tuple[str, frozenset[str]], ...] = (
+    ("/banking/", frozenset({"customer", "sdk", "admin"})),
     ("/sdk/", frozenset({"sdk", "developer", "admin"})),
     ("/synthetic/", frozenset({"developer", "admin"})),
     ("/response/", frozenset({"operator", "admin"})),
@@ -38,6 +44,7 @@ ROLE_POLICIES: tuple[tuple[str, frozenset[str]], ...] = (
     ("/threats", frozenset({"analyst", "operator", "developer", "sdk", "admin"})),
     ("/graph/", frozenset({"analyst", "operator", "developer", "admin"})),
     ("/platform/", frozenset({"analyst", "operator", "developer", "admin"})),
+    ("/device/", frozenset({"developer", "sdk", "admin"})),
 )
 DEFAULT_ROLES = frozenset({"analyst", "operator", "developer", "admin"})
 
@@ -68,6 +75,8 @@ def create_access_token(
     client_id: str,
     client: dict[str, Any],
     settings: PlatformSettings = platform_settings,
+    *,
+    subject: str | None = None,
 ) -> tuple[str, int]:
     now = int(time.time())
     expires_at = now + settings.jwt_ttl_seconds
@@ -75,7 +84,7 @@ def create_access_token(
     payload = {
         "iss": settings.jwt_issuer,
         "aud": settings.jwt_audience,
-        "sub": client_id,
+        "sub": subject or client_id,
         "client_id": client_id,
         "roles": client.get("roles", []),
         "tenant_id": client.get("tenant_id"),

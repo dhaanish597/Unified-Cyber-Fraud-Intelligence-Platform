@@ -97,7 +97,7 @@ def test_authoritative_sdk_pipeline_reports_explicit_model_and_graph_state():
 
 def test_model_runtime_never_pretends_missing_artifacts_executed(tmp_path):
     result = ModelRuntime(tmp_path).infer({"amount": 1})
-    assert result.status == "FALLBACK"
+    assert result.status == "ModelUnavailable"
     assert result.fraud_probability is None
     assert result.anomaly_score is None
     assert result.error_code == "MODEL_METADATA_MISSING"

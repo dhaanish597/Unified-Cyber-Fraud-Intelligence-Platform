@@ -236,9 +236,8 @@ def test_rest_api_and_websocket_bootstrap(
             f"/ws/stream?session_id=SESS_API_TEST&access_token={token}"
         ) as websocket:
             bootstrap = websocket.receive_json()
-            assert bootstrap["msg_type"] == "trust_passport_update"
-            assert bootstrap["event_type"] == "TRUST_BOOTSTRAP"
-            assert bootstrap["passport"]["session_id"] == "SESS_API_TEST"
+            assert bootstrap["msg_type"] == "connection_ack"
+            assert bootstrap["session_id"] == "SESS_API_TEST"
 
 
 def test_registry_supports_one_thousand_sessions(

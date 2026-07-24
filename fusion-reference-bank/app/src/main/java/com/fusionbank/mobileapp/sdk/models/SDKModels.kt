@@ -7,9 +7,64 @@ data class SDKTokenRequest(
     @SerializedName("client_secret") val clientSecret: String
 )
 
+data class PairingRegistrationRequest(
+    @SerializedName("pair_id") val pairId: String,
+    @SerializedName("bootstrap_token") val bootstrapToken: String,
+    @SerializedName("device_uuid") val deviceUuid: String,
+    @SerializedName("android_version") val androidVersion: String,
+    val manufacturer: String,
+    val model: String,
+    @SerializedName("sdk_version") val sdkVersion: String,
+    @SerializedName("app_version") val appVersion: String,
+    val fingerprint: String,
+)
+
+data class PairingRegistrationResponse(
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("refresh_token") val refreshToken: String,
+    @SerializedName("session_token") val sessionToken: String,
+    @SerializedName("expires_at") val expiresAt: Long,
+    @SerializedName("backend_url") val backendUrl: String,
+    @SerializedName("ws_url") val wsUrl: String,
+)
+
 data class SDKTokenResponse(
     @SerializedName("access_token") val accessToken: String,
-    @SerializedName("expires_at") val expiresAt: Long
+    @SerializedName("expires_at") val expiresAt: Long,
+    @SerializedName("refresh_token") val refreshToken: String? = null,
+    @SerializedName("refresh_expires_at") val refreshExpiresAt: Long? = null
+)
+
+data class BankingLoginRequest(
+    @SerializedName("username") val username: String,
+    @SerializedName("password") val password: String,
+    @SerializedName("device_id") val deviceId: String
+)
+
+data class BankingRefreshRequest(
+    @SerializedName("refresh_token") val refreshToken: String,
+    @SerializedName("device_id") val deviceId: String
+)
+
+data class BankingLogoutRequest(
+    @SerializedName("refresh_token") val refreshToken: String?
+)
+
+data class BankingProfile(
+    @SerializedName("user_id") val userId: String,
+    @SerializedName("username") val username: String,
+    @SerializedName("display_name") val displayName: String,
+    @SerializedName("email") val email: String,
+    @SerializedName("tenant_id") val tenantId: String
+)
+
+data class BankingAuthResponse(
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("expires_at") val expiresAt: Long,
+    @SerializedName("refresh_token") val refreshToken: String,
+    @SerializedName("refresh_expires_at") val refreshExpiresAt: Long,
+    @SerializedName("profile") val profile: BankingProfile
 )
 
 data class SDKSessionStartRequest(
@@ -39,6 +94,11 @@ data class SDKSessionResponse(
     @SerializedName("network_trust") val networkTrust: Float?,
     @SerializedName("runtime_trust") val runtimeTrust: Float?,
     @SerializedName("trust_status") val trustStatus: String = "PENDING_AUTHORITATIVE_EVIDENCE"
+    ,
+    @SerializedName("request_id") val requestId: String? = null,
+    @SerializedName("correlation_id") val correlationId: String? = null,
+    @SerializedName("pipeline_id") val pipelineId: String? = null,
+    @SerializedName("backend_ack") val backendAck: Boolean = false
 )
 
 data class SDKDeviceRequest(
@@ -88,7 +148,9 @@ data class SDKEventRequest(
     @SerializedName("device_id") val deviceId: String,
     @SerializedName("event_type") val eventType: String,
     @SerializedName("amount") val amount: Double = 0.0,
-    @SerializedName("sdk_version") val sdkVersion: String = "FAT-SDK v2.4.1"
+    @SerializedName("sdk_version") val sdkVersion: String = "FAT-SDK v2.4.1",
+    @SerializedName("request_id") val requestId: String,
+    @SerializedName("correlation_id") val correlationId: String
 )
 
 data class SDKEventResponse(
@@ -96,7 +158,11 @@ data class SDKEventResponse(
     @SerializedName("session_id") val sessionId: String,
     @SerializedName("event_type") val eventType: String,
     @SerializedName("timestamp") val timestamp: String,
-    @SerializedName("ingestion_latency_ms") val ingestionLatencyMs: Float
+    @SerializedName("ingestion_latency_ms") val ingestionLatencyMs: Float,
+    @SerializedName("request_id") val requestId: String?,
+    @SerializedName("correlation_id") val correlationId: String?,
+    @SerializedName("pipeline_id") val pipelineId: String?,
+    @SerializedName("backend_ack") val backendAck: Boolean
 )
 
 data class SDKDecisionRequest(
@@ -104,18 +170,29 @@ data class SDKDecisionRequest(
     @SerializedName("event_type") val eventType: String,
     @SerializedName("amount") val amount: Double,
     @SerializedName("vpn_detected") val vpnDetected: Boolean = false,
-    @SerializedName("root_detected") val rootDetected: Boolean = false
+    @SerializedName("root_detected") val rootDetected: Boolean = false,
+    @SerializedName("beneficiary_id") val beneficiaryId: String? = null,
+    @SerializedName("request_id") val requestId: String,
+    @SerializedName("correlation_id") val correlationId: String
 )
 
 data class SDKDecisionResponse(
     @SerializedName("decision_id") val decisionId: String,
     @SerializedName("session_id") val sessionId: String,
     @SerializedName("decision") val decision: String,
-    @SerializedName("confidence") val confidence: Float,
+    @SerializedName("confidence") val confidence: Float?,
     @SerializedName("reason_codes") val reasonCodes: List<String>,
     @SerializedName("recommended_action") val recommendedAction: String,
     @SerializedName("policy_version") val policyVersion: String,
-    @SerializedName("decision_latency_ms") val decisionLatencyMs: Float
+    @SerializedName("decision_latency_ms") val decisionLatencyMs: Float,
+    @SerializedName("pipeline_id") val pipelineId: String,
+    @SerializedName("request_id") val requestId: String,
+    @SerializedName("correlation_id") val correlationId: String,
+    @SerializedName("backend_ack") val backendAck: Boolean,
+    @SerializedName("model_status") val modelStatus: String,
+    @SerializedName("model_error_code") val modelErrorCode: String?,
+    @SerializedName("graph_status") val graphStatus: String,
+    @SerializedName("graph_backend") val graphBackend: String
 )
 
 data class SDKPoliciesResponse(

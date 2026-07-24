@@ -41,10 +41,22 @@ class SecureStorage(context: Context) {
         prefs.edit().clear().apply()
     }
 
+    fun clearSessionPreservingDevice() {
+        val deviceId = getString(KEY_DEVICE_ID)
+        prefs.edit().clear().apply()
+        if (deviceId != null) saveString(KEY_DEVICE_ID, deviceId)
+    }
+
     companion object {
         const val KEY_SESSION_ID = "key_session_id"
         const val KEY_USER_ID = "key_user_id"
         const val KEY_DEVICE_ID = "key_device_id"
         const val KEY_TRUST_SCORE = "key_trust_score"
+        const val KEY_ACCESS_TOKEN = "key_access_token"
+        const val KEY_ACCESS_EXPIRES_AT = "key_access_expires_at"
+        const val KEY_REFRESH_TOKEN = "key_refresh_token"
+        const val KEY_REFRESH_EXPIRES_AT = "key_refresh_expires_at"
+        const val KEY_BACKEND_URL = "key_backend_url"
+        const val KEY_WS_URL = "key_ws_url"
     }
 }

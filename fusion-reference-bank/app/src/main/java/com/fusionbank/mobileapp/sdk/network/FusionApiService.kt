@@ -9,6 +9,29 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface FusionApiService {
+    @POST("device/register")
+    suspend fun registerPairedDevice(
+        @Body request: PairingRegistrationRequest
+    ): Response<PairingRegistrationResponse>
+
+    @POST("banking/auth/login")
+    suspend fun bankingLogin(
+        @Body request: BankingLoginRequest
+    ): Response<BankingAuthResponse>
+
+    @POST("banking/auth/refresh")
+    suspend fun refreshBankingToken(
+        @Body request: BankingRefreshRequest
+    ): Response<BankingAuthResponse>
+
+    @POST("banking/auth/logout")
+    suspend fun bankingLogout(
+        @Body request: BankingLogoutRequest
+    ): Response<Unit>
+
+    @GET("banking/profile")
+    suspend fun getBankingProfile(): Response<BankingProfile>
+
     @POST("auth/token")
     suspend fun createAccessToken(
         @Body request: SDKTokenRequest

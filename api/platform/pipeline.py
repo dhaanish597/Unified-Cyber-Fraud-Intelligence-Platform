@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -8,11 +9,10 @@ from typing import Any
 
 from api.cyber_threat_engine import CyberThreatEngine, cyber_threat_engine
 from api.sdk_engine import FusionAdaptiveTrustSDKEngine, sdk_engine
-from api.session_intelligence import session_intelligence, trust_update_broker
-
 from .graph_runtime import GraphRuntime, graph_runtime
 from .model_runtime import ModelRuntime, model_runtime
 from .decision_runtime import DecisionEngineAdapter, decision_engine
+from .events import PlatformEventBroker, platform_event_broker
 
 
 class PipelineValidationError(ValueError):
@@ -22,6 +22,8 @@ class PipelineValidationError(ValueError):
 @dataclass
 class PipelineResult:
     pipeline_id: str
+    request_id: str
+    correlation_id: str
     timestamp: str
     normalized_event: dict[str, Any]
     event_ack: dict[str, Any]
@@ -35,6 +37,8 @@ class PipelineResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "pipeline_id": self.pipeline_id,
+            "request_id": self.request_id,
+            "correlation_id": self.correlation_id,
             "timestamp": self.timestamp,
             "normalized_event": self.normalized_event,
             "event_ack": self.event_ack,
@@ -57,12 +61,17 @@ class AuthoritativePlatformPipeline:
         graph: GraphRuntime = graph_runtime,
         models: ModelRuntime = model_runtime,
         decisions: DecisionEngineAdapter = decision_engine,
+        events: PlatformEventBroker = platform_event_broker,
     ):
         self.sdk = sdk
         self.threat_engine = threats
         self.graph_runtime = graph
         self.model_runtime = models
         self.decision_engine = decisions
+        self.event_broker = events
+        self._idempotency_lock = asyncio.Lock()
+        self._completed: dict[tuple[str, str], PipelineResult] = {}
+        self._inflight: dict[tuple[str, str], asyncio.Future[PipelineResult]] = {}
 
     @staticmethod
     def normalize(payload: dict[str, Any]) -> dict[str, Any]:
@@ -82,6 +91,8 @@ class AuthoritativePlatformPipeline:
             event.get("timestamp") or datetime.now(timezone.utc).isoformat()
         )
         event.setdefault("event_id", f"EVT_{uuid.uuid4().hex[:12].upper()}")
+        event.setdefault("request_id", f"REQ_{uuid.uuid4().hex[:16].upper()}")
+        event.setdefault("correlation_id", f"COR_{uuid.uuid4().hex[:16].upper()}")
         return event
 
     async def process(
@@ -91,8 +102,52 @@ class AuthoritativePlatformPipeline:
         require_existing_session: bool,
         publish: bool = True,
     ) -> PipelineResult:
+        event = self.normalize(payload)
+        key = (event["session_id"], event["request_id"])
+        owner = False
+        async with self._idempotency_lock:
+            completed = self._completed.get(key)
+            if completed is not None:
+                return completed
+            future = self._inflight.get(key)
+            if future is None:
+                future = asyncio.get_running_loop().create_future()
+                self._inflight[key] = future
+                owner = True
+        if not owner:
+            return await asyncio.shield(future)
+        try:
+            result = await self._process_once(
+                event,
+                require_existing_session=require_existing_session,
+                publish=publish,
+            )
+            async with self._idempotency_lock:
+                self._completed[key] = result
+                while len(self._completed) > 2_000:
+                    self._completed.pop(next(iter(self._completed)))
+                self._inflight.pop(key, None)
+                if not future.done():
+                    future.set_result(result)
+            return result
+        except Exception as exception:
+            async with self._idempotency_lock:
+                self._inflight.pop(key, None)
+                if not future.done():
+                    future.set_exception(exception)
+                    future.exception()
+            raise
+
+    async def _process_once(
+        self,
+        payload: dict[str, Any],
+        *,
+        require_existing_session: bool,
+        publish: bool = True,
+    ) -> PipelineResult:
         total_started = time.perf_counter()
         event = self.normalize(payload)
+        pipeline_id = f"PIPE_{uuid.uuid4().hex[:12].upper()}"
         if require_existing_session and event["session_id"] not in self.sdk.sdk_sessions:
             raise PipelineValidationError("session_id is not active")
 
@@ -132,17 +187,19 @@ class AuthoritativePlatformPipeline:
         decision = self.decision_engine.decide(inference, all_threats)
         decision["session_id"] = event["session_id"]
 
-        session_update = None
-        passport = session_intelligence.repository.get_passport(event["session_id"])
-        if passport:
-            update = session_intelligence.process_event(event, all_threats)
-            session_update = update.model_dump(mode="json")
-            if publish:
-                await trust_update_broker.publish(session_update)
-
         total_ms = (time.perf_counter() - total_started) * 1000.0
-        return PipelineResult(
-            pipeline_id=f"PIPE_{uuid.uuid4().hex[:12].upper()}",
+        event_ack.update(
+            {
+                "backend_ack": True,
+                "pipeline_id": pipeline_id,
+                "request_id": event["request_id"],
+                "correlation_id": event["correlation_id"],
+            }
+        )
+        result = PipelineResult(
+            pipeline_id=pipeline_id,
+            request_id=event["request_id"],
+            correlation_id=event["correlation_id"],
             timestamp=datetime.now(timezone.utc).isoformat(),
             normalized_event=event,
             event_ack=event_ack,
@@ -150,7 +207,7 @@ class AuthoritativePlatformPipeline:
             graph=graph_payload,
             inference=inference.to_dict(),
             decision=decision,
-            session_update=session_update,
+            session_update=None,
             timings={
                 "normalization_and_ingest_ms": round(normalize_ingest_ms, 3),
                 "threat_engine_ms": round(threat_ms, 3),
@@ -159,6 +216,15 @@ class AuthoritativePlatformPipeline:
                 "total_ms": round(total_ms, 3),
             },
         )
+        if publish:
+            await self.event_broker.publish(
+                {
+                    "msg_type": "pipeline_decision",
+                    "session_id": event["session_id"],
+                    **result.to_dict(),
+                }
+            )
+        return result
 
 
 platform_pipeline = AuthoritativePlatformPipeline()

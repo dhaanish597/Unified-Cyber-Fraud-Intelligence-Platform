@@ -4,10 +4,11 @@ import sys
 import io
 import datetime
 import hmac
+import secrets
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 
 # PDF Generation
@@ -44,10 +45,14 @@ from api.platform import (
 )
 from api.platform.observability import RequestContextMiddleware
 from api.platform.security import authenticate_websocket
+from api.platform.banking_auth import router as banking_auth_router
+from api.platform.events import platform_event_broker
 from api.platform.graph_runtime import graph_runtime
 from api.platform.model_runtime import model_runtime
 from api.platform.pipeline import PipelineValidationError, platform_pipeline
 from api.platform.decision_runtime import decision_engine
+from api.platform.pairing import pairing_registry
+from api.platform.notifications import notification_service
 from api.gateway_integration import router as gateway_router
 
 
@@ -69,6 +74,102 @@ app.add_middleware(PlatformSecurityMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
 app.include_router(gateway_router)
+app.include_router(banking_auth_router)
+
+
+class PairingRequest(BaseModel):
+    backend_url: str | None = None
+    ws_url: str | None = None
+
+
+class DeviceRegistrationRequest(BaseModel):
+    pair_id: str
+    bootstrap_token: str
+    device_uuid: str
+    android_version: str = "unknown"
+    manufacturer: str = "unknown"
+    model: str = "unknown"
+    sdk_version: str = "unknown"
+    app_version: str = "unknown"
+    fingerprint: str = ""
+
+
+@app.post("/device/pair")
+async def create_device_pairing(req: PairingRequest, request: Request):
+    backend = req.backend_url or str(request.base_url).rstrip("/")
+    ws = req.ws_url or backend.replace("https://", "wss://").replace("http://", "ws://") + "/ws/stream"
+    return pairing_registry.create(backend, ws)
+
+
+@app.post("/device/register")
+async def register_paired_device(req: DeviceRegistrationRequest):
+    record = pairing_registry.consume(req.pair_id, req.bootstrap_token)
+    if not record:
+        raise HTTPException(status_code=401, detail="Pairing token is invalid, expired, or already used")
+    device = pairing_registry.register_device(req.pair_id, req.model_dump())
+    client = platform_settings.clients.get("fusion-android-dev", {"roles": ["sdk"], "app_id": "com.fusionbank.mobileapp"})
+    access_token, expires_at = create_access_token(
+        "fusion-android-dev", {**client, "roles": ["sdk"]}, subject=device["device_id"]
+    )
+    refresh_token = secrets.token_urlsafe(32)
+    return {
+        **device,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "session_token": access_token,
+        "expires_at": expires_at,
+        "backend_url": record.backend_url,
+        "ws_url": record.ws_url,
+    }
+
+
+@app.get("/device/connected")
+async def connected_devices():
+    sessions = list(sdk_engine.sdk_sessions.values())
+    by_device = {item["device_id"]: item for item in sessions}
+    devices = []
+    for device in pairing_registry.list_devices():
+        item = {**device}
+        session = by_device.get(device["device_id"])
+        item["session_id"] = session.get("session_id") if session else None
+        item["user_id"] = session.get("user_id") if session else None
+        item["session_status"] = session.get("status") if session else "NOT_LOGGED_IN"
+        devices.append(item)
+    return {"devices": devices, "count": len(devices)}
+
+
+@app.get("/device/sessions")
+async def connected_device_sessions():
+    sessions = []
+    for session in sdk_engine.sdk_sessions.values():
+        item = {**session, "kind": "LIVE_DEVICE", "last_event": None, "threat_count": 0, "connection": "CONNECTED"}
+        recent = [event for event in platform_event_broker.recent(session_id=session["session_id"], limit=1)]
+        if recent:
+            item["last_event"] = recent[-1].get("event_type") or recent[-1].get("msg_type")
+            item["threat_count"] = len(recent[-1].get("threats", []))
+        sessions.append(item)
+    return {"sessions": sessions, "count": len(sessions)}
+
+
+@app.get("/banking/notifications")
+async def banking_notifications(request: Request, limit: int = 100):
+    return {"notifications": notification_service.list_for_user(request.state.auth.subject, limit), "channel": "IN_APP"}
+
+
+@app.get("/download/apk")
+async def download_demo_apk():
+    apk = ROOT / "fusion-reference-bank" / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk"
+    if not apk.exists():
+        raise HTTPException(status_code=404, detail="Build the debug APK before downloading")
+    return FileResponse(apk, media_type="application/vnd.android.package-archive", filename="fusion-risk-os-demo.apk")
+
+
+@app.get("/download/sdk")
+async def download_demo_sdk():
+    sdk = ROOT / "SDK_REFERENCE.md"
+    if not sdk.exists():
+        raise HTTPException(status_code=404, detail="SDK reference is not available")
+    return FileResponse(sdk, media_type="text/markdown", filename="fusion-sdk-reference.md")
 
 
 class TokenRequest(BaseModel):
@@ -139,6 +240,11 @@ async def platform_status():
 async def analyze_graph(payload: dict):
     return graph_runtime.process(payload).to_dict()
 
+
+@app.get("/graph/topology")
+async def graph_topology(limit: int = 500):
+    return graph_runtime.topology(limit)
+
 class TransactionRequest(BaseModel):
     session_id: str | None = None
     txn_id: str = "txn_0000"
@@ -169,8 +275,9 @@ class CertInReportRequest(BaseModel):
     score: float
 
 @app.post("/evaluate/transaction")
-async def evaluate_transaction(txn: TransactionRequest):
+async def evaluate_transaction(txn: TransactionRequest, request: Request):
     txn_dict = txn.dict()
+    txn_dict["request_id"] = request.state.request_id
     txn_dict["session_id"] = txn.session_id or f"TXN_CONTEXT_{txn.txn_id}"
     txn_dict["event_type"] = "TRANSACTION_EVALUATION"
     result = await platform_pipeline.process(
@@ -188,12 +295,16 @@ async def evaluate_transaction(txn: TransactionRequest):
         ),
         "fallback_used": (
             result.inference["implementation"]
-            if result.inference["status"] == "FALLBACK"
+            if result.inference["status"] == "ModelUnavailable"
             else None
         ),
         "graph": result.graph,
         "threats": result.threats,
         "pipeline_id": result.pipeline_id,
+        "request_id": result.request_id,
+        "correlation_id": result.correlation_id,
+        "backend_ack": result.event_ack["backend_ack"],
+        "timings": result.timings,
     }
 
 @app.post("/evaluate/transaction/pipeline")
@@ -894,29 +1005,32 @@ async def simulate_quantum_threat(req: QuantumSimulateRequest):
 
 async def websocket_endpoint(websocket: WebSocket):
     try:
-        authenticate_websocket(websocket)
+        auth = authenticate_websocket(websocket)
     except HTTPException as exc:
         await websocket.close(code=4401, reason=str(exc.detail))
         return
     await websocket.accept()
     session_filter = websocket.query_params.get("session_id")
-    trust_only = websocket.query_params.get("stream") == "trust"
-    subscription = await trust_update_broker.subscribe(session_filter)
+    if session_filter and "customer" in auth.roles:
+        owned_session = sdk_engine.sdk_sessions.get(session_filter)
+        if not owned_session or owned_session.get("user_id") != auth.subject:
+            await websocket.close(code=4403, reason="Session is not owned by this identity")
+            return
+    subscription = await platform_event_broker.subscribe(session_filter)
 
     try:
-        # Session-scoped clients receive current state before live updates.
-        # Unscoped clients receive only events produced by the authoritative
-        # pipeline; no synthetic replay is injected into a production stream.
-        if session_filter:
-            passport = session_intelligence.repository.get_passport(session_filter)
-            if passport:
-                await websocket.send_json({
-                    "msg_type": "trust_passport_update",
-                    "session_id": session_filter,
-                    "event_type": "TRUST_BOOTSTRAP",
-                    "passport": passport.to_compatible_dict(),
-                    "deltas": [],
-                })
+        await websocket.send_json(
+            {
+                "msg_type": "connection_ack",
+                "session_id": session_filter,
+                "authenticated_subject": auth.subject,
+            }
+        )
+        for recent_event in platform_event_broker.recent(
+            session_id=session_filter,
+            limit=20,
+        ):
+            await websocket.send_json(recent_event)
 
         while True:
             receive_task = asyncio.create_task(websocket.receive_text())
@@ -945,7 +1059,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
-        await trust_update_broker.unsubscribe(subscription.subscription_id)
+        await platform_event_broker.unsubscribe(subscription.subscription_id)
 
 # --- FUSION ADAPTIVE TRUST SDK (FAT-SDK) ENDPOINTS ---
 class SDKSessionStartRequest(BaseModel):
@@ -986,6 +1100,8 @@ class SDKEventRequest(BaseModel):
     event_type: str
     amount: float = 0.0
     sdk_version: str = "FAT-SDK v2.4.1"
+    request_id: str | None = None
+    correlation_id: str | None = None
 
 class SDKDecisionRequest(BaseModel):
     session_id: str
@@ -993,6 +1109,9 @@ class SDKDecisionRequest(BaseModel):
     amount: float
     vpn_detected: bool = False
     root_detected: bool = False
+    beneficiary_id: str | None = None
+    request_id: str | None = None
+    correlation_id: str | None = None
 
 @app.post("/sdk/session/start")
 async def sdk_session_start(req: SDKSessionStartRequest, request: Request):
@@ -1001,6 +1120,8 @@ async def sdk_session_start(req: SDKSessionStartRequest, request: Request):
         raise HTTPException(status_code=403, detail="Token is not scoped to this application")
     if auth.tenant_id and auth.tenant_id != req.tenant_id:
         raise HTTPException(status_code=403, detail="Token is not scoped to this tenant")
+    if "customer" in auth.roles and auth.subject != req.user_id:
+        raise HTTPException(status_code=403, detail="Banking identity cannot start another user's session")
     session = sdk_engine.start_session(req.model_dump())
     device_profile = sdk_engine.device_profiles.get(session["device_id"], {})
     device_event = {
@@ -1010,21 +1131,28 @@ async def sdk_session_start(req: SDKSessionStartRequest, request: Request):
         "device_id": session["device_id"],
         "event_type": "DEVICE_ATTESTATION",
     }
-    initial_threats = cyber_threat_engine.evaluate_event(device_event)
-    update = session_intelligence.start_session(session, device_event, initial_threats)
-    await trust_update_broker.publish(update.model_dump(mode="json"))
-    return session
+    result = await platform_pipeline.process(device_event, require_existing_session=True)
+    return {
+        **session,
+        "request_id": result.request_id,
+        "correlation_id": result.correlation_id,
+        "pipeline_id": result.pipeline_id,
+        "backend_ack": result.event_ack["backend_ack"],
+        "initial_threat_count": len(result.threats),
+    }
 
 @app.post("/sdk/device")
 async def sdk_register_device(req: SDKDeviceRequest):
     return sdk_engine.register_device(req.model_dump())
 
 @app.post("/sdk/network")
-async def sdk_register_network(req: SDKNetworkRequest):
+async def sdk_register_network(req: SDKNetworkRequest, request: Request):
     response = sdk_engine.register_network(req.model_dump())
     session = sdk_engine.sdk_sessions.get(req.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="SDK session is not active")
+    if "customer" in request.state.auth.roles and session["user_id"] != request.state.auth.subject:
+        raise HTTPException(status_code=403, detail="SDK session is not owned by this identity")
     event = {
         **req.model_dump(),
         "event_type": "NETWORK_ATTESTATION",
@@ -1035,11 +1163,14 @@ async def sdk_register_network(req: SDKNetworkRequest):
     return response
 
 @app.post("/sdk/event")
-async def sdk_ingest_event(req: SDKEventRequest):
+async def sdk_ingest_event(req: SDKEventRequest, request: Request):
     event_dict = req.model_dump()
+    event_dict["request_id"] = req.request_id or request.state.request_id
     session = sdk_engine.sdk_sessions.get(req.session_id)
     if session:
         event_dict["user_id"] = session["user_id"]
+        if "customer" in request.state.auth.roles and session["user_id"] != request.state.auth.subject:
+            raise HTTPException(status_code=403, detail="SDK session is not owned by this identity")
     try:
         result = await platform_pipeline.process(
             event_dict, require_existing_session=True
@@ -1049,12 +1180,15 @@ async def sdk_ingest_event(req: SDKEventRequest):
     return result.event_ack
 
 @app.post("/sdk/request-decision")
-async def sdk_request_decision(req: SDKDecisionRequest):
+async def sdk_request_decision(req: SDKDecisionRequest, request: Request):
     dec_dict = req.model_dump()
+    dec_dict["request_id"] = req.request_id or request.state.request_id
     session = sdk_engine.sdk_sessions.get(req.session_id)
     if session:
         dec_dict["user_id"] = session["user_id"]
         dec_dict["device_id"] = session["device_id"]
+        if "customer" in request.state.auth.roles and session["user_id"] != request.state.auth.subject:
+            raise HTTPException(status_code=403, detail="SDK session is not owned by this identity")
     try:
         result = await platform_pipeline.process(
             dec_dict, require_existing_session=True
@@ -1068,6 +1202,14 @@ async def sdk_request_decision(req: SDKDecisionRequest):
         "policy_version": sdk_engine.policy_version,
         "decision_latency_ms": result.timings["total_ms"],
         "pipeline_id": result.pipeline_id,
+        "request_id": result.request_id,
+        "correlation_id": result.correlation_id,
+        "backend_ack": result.event_ack["backend_ack"],
+        "model_status": result.inference["status"],
+        "model_error_code": result.inference["error_code"],
+        "graph_status": result.graph["status"],
+        "graph_backend": result.graph["backend"],
+        "timings": result.timings,
         "model_used": (
             result.inference["implementation"]
             if result.inference["status"] == "EXECUTED"
@@ -1075,7 +1217,7 @@ async def sdk_request_decision(req: SDKDecisionRequest):
         ),
         "fallback_used": (
             result.inference["implementation"]
-            if result.inference["status"] == "FALLBACK"
+            if result.inference["status"] == "ModelUnavailable"
             else None
         ),
     }

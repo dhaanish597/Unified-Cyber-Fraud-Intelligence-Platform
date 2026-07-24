@@ -45,7 +45,7 @@ fun LiveStatusCard(
     }
 
     val sessionId = activeSession?.sessionId ?: "SDK_SESS_INACTIVE"
-    val trustScore = trustPassport?.overallTrust ?: activeSession?.compositeTrustScore ?: 82.0f
+    val trustScore = trustPassport?.overallTrust ?: activeSession?.compositeTrustScore
     val policyVersion = trustPassport?.version ?: activeSession?.policyVersion ?: "v1.0.3"
 
     Card(
@@ -133,9 +133,14 @@ fun LiveStatusCard(
                 Column(horizontalAlignment = Alignment.End) {
                     Text("TRUST PASSPORT", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, fontSize = 9.sp)
                     Text(
-                        text = "${String.format("%.1f", trustScore)} / 100",
+                        text = trustScore?.let { "${String.format("%.1f", it)} / 100" } ?: "UNAVAILABLE",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (trustScore >= 75) StatusGreen else if (trustScore >= 45) StatusYellow else StatusRed,
+                        color = when {
+                            trustScore == null -> TextSecondaryDark
+                            trustScore >= 75 -> StatusGreen
+                            trustScore >= 45 -> StatusYellow
+                            else -> StatusRed
+                        },
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp
                     )
@@ -155,7 +160,7 @@ fun LiveStatusCard(
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text("LATENCY / SYNC", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, fontSize = 9.sp)
-                    Text("${latencyMs.toInt()}ms • Live", style = MaterialTheme.typography.labelSmall, color = TextPrimaryDark, fontSize = 11.sp)
+                    Text(latencyMs?.let { "${it.toInt()}ms • Live" } ?: "NOT MEASURED", style = MaterialTheme.typography.labelSmall, color = TextPrimaryDark, fontSize = 11.sp)
                 }
             }
 

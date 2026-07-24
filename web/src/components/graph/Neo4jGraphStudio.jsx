@@ -36,7 +36,7 @@ export default function Neo4jGraphStudio({ graphData, onNodeClick }) {
             Neo4j Threat Graph Visualizer
           </span>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-soc-bg border border-soc-border text-soc-muted">
-            NetworkX / GraphSAGE Centrality Engine
+            Observed graph topology
           </span>
         </div>
 
@@ -147,16 +147,16 @@ export default function Neo4jGraphStudio({ graphData, onNodeClick }) {
               </div>
               <div className="flex justify-between">
                 <span className="text-soc-muted">PageRank:</span>
-                <span className="text-soc-text">{selectedNode.pagerank || '0.0042'}</span>
+                <span className="text-soc-text">{selectedNode.pagerank ?? 'Not computed'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-soc-muted">Betweenness:</span>
-                <span className="text-soc-text">{selectedNode.betweenness || '0.0120'}</span>
+                <span className="text-soc-text">{selectedNode.betweenness ?? 'Not computed'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-soc-muted">Mule Cluster:</span>
                 <span className={selectedNode.isMule ? "text-soc-danger font-bold" : "text-soc-success"}>
-                  {selectedNode.isMule ? "FLAGGED RING" : "CLEAN"}
+                  {selectedNode.isMule ? "FLAGGED RING" : "NOT FLAGGED"}
                 </span>
               </div>
             </div>

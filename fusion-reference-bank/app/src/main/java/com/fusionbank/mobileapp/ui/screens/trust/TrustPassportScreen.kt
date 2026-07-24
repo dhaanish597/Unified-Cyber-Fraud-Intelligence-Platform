@@ -216,7 +216,7 @@ private fun PassportSummary(
     status: String?,
     trend: String?,
     updatedAt: String?,
-    latency: Float,
+    latency: Float?,
     connection: FusionConnectionState
 ) {
     Card(
@@ -248,7 +248,7 @@ private fun PassportSummary(
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Stream: $connection", color = if (connection == FusionConnectionState.CONNECTED) StatusGreen else StatusYellow, fontSize = 10.sp)
-                Text("${latency.toInt()} ms", color = TextSecondaryDark, fontSize = 10.sp)
+                Text(latency?.let { "${it.toInt()} ms" } ?: "Not measured", color = TextSecondaryDark, fontSize = 10.sp)
             }
             if (!updatedAt.isNullOrBlank()) {
                 Text("Updated $updatedAt", color = TextSecondaryDark, fontSize = 9.sp, maxLines = 1)

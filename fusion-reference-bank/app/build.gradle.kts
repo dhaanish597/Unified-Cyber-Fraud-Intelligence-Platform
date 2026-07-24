@@ -29,6 +29,16 @@ android {
     val releaseStorePassword = providers.gradleProperty("FUSION_RELEASE_STORE_PASSWORD").orNull
     val releaseKeyAlias = providers.gradleProperty("FUSION_RELEASE_KEY_ALIAS").orNull
     val releaseKeyPassword = providers.gradleProperty("FUSION_RELEASE_KEY_PASSWORD").orNull
+    val releaseBaseUrl = providers.gradleProperty("FUSION_BASE_URL")
+        .orElse(providers.environmentVariable("FUSION_BASE_URL"))
+        .getOrElse("https://fusion.example.invalid/")
+    val releaseWebSocketUrl = providers.gradleProperty("FUSION_WS_URL")
+        .orElse(providers.environmentVariable("FUSION_WS_URL"))
+        .getOrElse("wss://fusion.example.invalid/ws/stream")
+    val debugBaseUrl = providers.gradleProperty("FUSION_DEBUG_BASE_URL")
+        .getOrElse("http://10.0.2.2:8001/")
+    val debugWebSocketUrl = providers.gradleProperty("FUSION_DEBUG_WS_URL")
+        .getOrElse("ws://10.0.2.2:8001/ws/stream")
     signingConfigs {
         if (listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword).all { !it.isNullOrBlank() }) {
             create("release") {
@@ -42,8 +52,14 @@ android {
 
     buildTypes {
         release {
-            buildConfigField("String", "FUSION_BASE_URL", "\"https://fusion.example.invalid/\"")
-            buildConfigField("String", "FUSION_WS_URL", "\"wss://fusion.example.invalid/ws/stream\"")
+            require(releaseBaseUrl.startsWith("https://") && releaseBaseUrl.endsWith("/")) {
+                "Release FUSION_BASE_URL must be an HTTPS URL ending in /"
+            }
+            require(releaseWebSocketUrl.startsWith("wss://")) {
+                "Release FUSION_WS_URL must be a WSS URL"
+            }
+            buildConfigField("String", "FUSION_BASE_URL", "\"$releaseBaseUrl\"")
+            buildConfigField("String", "FUSION_WS_URL", "\"$releaseWebSocketUrl\"")
             buildConfigField("String", "FUSION_DEV_CLIENT_ID", "\"\"")
             buildConfigField("String", "FUSION_DEV_CLIENT_SECRET", "\"\"")
             isMinifyEnabled = true
@@ -55,8 +71,8 @@ android {
             signingConfigs.findByName("release")?.let { signingConfig = it }
         }
         debug {
-            buildConfigField("String", "FUSION_BASE_URL", "\"http://10.0.2.2:8001/\"")
-            buildConfigField("String", "FUSION_WS_URL", "\"ws://10.0.2.2:8001/ws/stream\"")
+            buildConfigField("String", "FUSION_BASE_URL", "\"$debugBaseUrl\"")
+            buildConfigField("String", "FUSION_WS_URL", "\"$debugWebSocketUrl\"")
             buildConfigField("String", "FUSION_DEV_CLIENT_ID", "\"fusion-android-dev\"")
             buildConfigField("String", "FUSION_DEV_CLIENT_SECRET", "\"fusion-android-local-only\"")
             isMinifyEnabled = false

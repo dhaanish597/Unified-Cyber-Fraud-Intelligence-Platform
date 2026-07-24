@@ -14,9 +14,9 @@ def test_device_threat_detection():
     root_threat = next((t for t in threats if t["threat_category"] == "Device Threats"), None)
     assert root_threat is not None
     assert root_threat["severity"] == "CRITICAL"
-    assert root_threat["confidence"] >= 90.0
+    assert root_threat["confidence"] is None
     assert {"field": "root_detected", "observed_value": True} in root_threat["evidence"]
-    assert root_threat["confidence_basis"]["method"] == "OBSERVED_EVIDENCE_COVERAGE"
+    assert root_threat["confidence_basis"]["method"] == "NOT_CALIBRATED"
 
 def test_frida_runtime_threat():
     engine = CyberThreatEngine()
@@ -42,8 +42,8 @@ def test_campaign_correlation():
     campaign = next((t for t in threats if t["threat_category"] == "Campaign Correlation"), None)
     assert campaign is not None
     assert "ACCOUNT TAKEOVER" in campaign["threat_name"]
-    assert campaign["confidence"] == 100.0
-    assert campaign["confidence_basis"]["method"] == "MEAN_CORRELATED_FINDING_CONFIDENCE"
+    assert campaign["confidence"] is None
+    assert campaign["confidence_basis"]["method"] == "NOT_CALIBRATED"
 
 if __name__ == "__main__":
     test_device_threat_detection()

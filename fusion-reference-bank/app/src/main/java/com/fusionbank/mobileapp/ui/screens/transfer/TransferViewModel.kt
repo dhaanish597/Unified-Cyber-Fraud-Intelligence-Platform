@@ -45,13 +45,10 @@ class TransferViewModel @Inject constructor() : ViewModel() {
         _errorMessage.value = null
         _decisionResult.value = null
 
-        // 1. Send TELEMETRY EVENT for TRANSFER_INITIATED
-        Fusion.reportEvent("TRANSFER_INITIATED", amt)
-
-        // 2. Request REALTIME DECISION from Fusion SDK Backend
         Fusion.requestDecision(
             eventType = "TRANSFER_INITIATED",
-            amount = amt
+            amount = amt,
+            beneficiaryId = _recipient.value
         ) { result ->
             _isEvaluating.value = false
             result.onSuccess { decision ->

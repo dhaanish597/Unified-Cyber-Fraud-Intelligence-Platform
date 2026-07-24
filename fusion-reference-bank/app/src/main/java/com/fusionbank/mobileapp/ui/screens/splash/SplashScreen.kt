@@ -14,15 +14,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fusionbank.mobileapp.ui.theme.*
-import kotlinx.coroutines.delay
+import com.fusionbank.mobileapp.sdk.Fusion
 
 @Composable
 fun SplashScreen(
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    onNavigateToDashboard: () -> Unit
 ) {
     LaunchedEffect(Unit) {
-        delay(1500)
-        onNavigateToLogin()
+        Fusion.restoreSession { result ->
+            result.fold(
+                onSuccess = { onNavigateToDashboard() },
+                onFailure = { onNavigateToLogin() }
+            )
+        }
     }
 
     Box(

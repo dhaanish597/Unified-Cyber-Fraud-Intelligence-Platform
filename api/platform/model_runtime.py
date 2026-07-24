@@ -135,7 +135,7 @@ class ModelRuntime:
             action = "ALLOW"
             reasons.append("No blocking deterministic policy matched")
         return InferenceResult(
-            status="FALLBACK",
+            status="ModelUnavailable",
             implementation="POLICY_FALLBACK",
             version="policy-v1.0.3",
             action=action,
