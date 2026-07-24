@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
+const WS_BASE = (import.meta.env.VITE_WS_BASE || API_BASE).replace(/^http/, 'ws');
 
 // ─── Syntax-highlight JSON for the API Explorer ───
 function JsonBlock({ data }) {
@@ -109,6 +110,9 @@ const API_ENDPOINTS = [
   { method: 'GET', path: '/sdk/health', desc: 'SDK observability & health metrics', category: 'Health' },
   { method: 'GET', path: '/sdk/apps', desc: 'Connected application registry', category: 'Apps' },
   { method: 'GET', path: '/sdk/events', desc: 'Live event stream (last 20 events)', category: 'Events' },
+  { method: 'GET', path: '/sessions', desc: 'Live session intelligence registry', category: 'Trust' },
+  { method: 'GET', path: '/trust-passport', desc: 'Latest enterprise Trust Passport', category: 'Trust' },
+  { method: 'GET', path: '/trust/live', desc: 'Recent Trust Passport updates', category: 'Trust' },
 ];
 
 export default function FATSDKDeveloperPortal() {
@@ -117,6 +121,8 @@ export default function FATSDKDeveloperPortal() {
   const [apps, setApps] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [liveEvents, setLiveEvents] = useState([]);
+  const [trustUpdates, setTrustUpdates] = useState([]);
+  const [trustStreamState, setTrustStreamState] = useState('CONNECTING');
   const [loading, setLoading] = useState(true);
 
   // API Explorer state
@@ -136,6 +142,36 @@ export default function FATSDKDeveloperPortal() {
     fetchData();
     const interval = setInterval(fetchLive, 3000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let socket;
+    let reconnectTimer;
+    let disposed = false;
+    const connect = () => {
+      setTrustStreamState('CONNECTING');
+      socket = new WebSocket(`${WS_BASE}/ws/stream?stream=trust`);
+      socket.onopen = () => setTrustStreamState('LIVE');
+      socket.onmessage = (message) => {
+        const update = JSON.parse(message.data);
+        if (update.msg_type === 'trust_passport_update') {
+          setTrustUpdates((current) => [update, ...current].slice(0, 50));
+        }
+      };
+      socket.onclose = () => {
+        if (!disposed) {
+          setTrustStreamState('RECONNECTING');
+          reconnectTimer = setTimeout(connect, 1500);
+        }
+      };
+      socket.onerror = () => socket.close();
+    };
+    connect();
+    return () => {
+      disposed = true;
+      clearTimeout(reconnectTimer);
+      socket?.close();
+    };
   }, []);
 
   const fetchData = async () => {
@@ -560,6 +596,40 @@ export default function FATSDKDeveloperPortal() {
                 <div className={`text-xl font-black ${m.color}`}>{m.value}</div>
               </div>
             ))}
+          </div>
+          <div className="rounded-lg border border-soc-border bg-soc-panel p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase text-soc-dim">Live Trust Passport Stream</span>
+              <span className={`flex items-center gap-1 text-[10px] font-bold ${trustStreamState === 'LIVE' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <span className={`h-2 w-2 rounded-full ${trustStreamState === 'LIVE' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                {trustStreamState}
+              </span>
+            </div>
+            <div className="max-h-64 space-y-2 overflow-y-auto">
+              {trustUpdates.length === 0 ? (
+                <div className="rounded border border-soc-border bg-soc-bg p-4 text-center text-[11px] text-soc-dim">
+                  Waiting for a session trust update.
+                </div>
+              ) : trustUpdates.map((update, index) => (
+                <div key={`${update.session_id}-${update.passport?.updated_time}-${index}`} className="rounded border border-soc-border bg-soc-bg p-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[10px] font-bold text-cyan-300">{update.session_id}</div>
+                      <div className="text-[9px] text-soc-muted">{update.event_type} • {update.passport?.current_status}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-base font-black text-soc-text">{Number(update.passport?.overall_trust ?? 0).toFixed(1)}</div>
+                      <div className="text-[9px] text-soc-muted">{Number(update.processing_time_ms ?? 0).toFixed(1)} ms</div>
+                    </div>
+                  </div>
+                  {update.deltas?.length > 0 && (
+                    <div className="mt-1 truncate text-[9px] text-soc-muted">
+                      {update.deltas.map((delta) => `${delta.component} ${delta.difference > 0 ? '+' : ''}${Number(delta.difference).toFixed(1)}`).join(' • ')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
           <div className="space-y-2 max-h-72 overflow-y-auto" ref={liveRef}>
             <span className="text-[10px] text-soc-dim uppercase font-bold block">Live Event Stream</span>

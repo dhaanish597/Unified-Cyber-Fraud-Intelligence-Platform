@@ -856,6 +856,7 @@ async def simulate_quantum_threat(req: QuantumSimulateRequest):
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     session_filter = websocket.query_params.get("session_id")
+    trust_only = websocket.query_params.get("stream") == "trust"
     subscription = await trust_update_broker.subscribe(session_filter)
 
     try:
@@ -872,7 +873,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     "passport": passport.to_compatible_dict(),
                     "deltas": [],
                 })
-        else:
+        elif not trust_only:
             for event in get_demo_events():
                 delay = event.pop("delay", 1.0)
                 await websocket.send_json(event)

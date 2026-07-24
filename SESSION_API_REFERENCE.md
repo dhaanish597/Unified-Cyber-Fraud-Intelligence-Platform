@@ -175,6 +175,12 @@ Send text `ping` or JSON `{"type":"ping"}` to receive `{"msg_type":"pong"}`.
 
 Unscoped clients retain the previous dashboard replay for compatibility and then receive live updates for all sessions.
 
+Developer tooling can bypass the legacy replay and receive all session updates immediately:
+
+```text
+ws://localhost:8001/ws/stream?stream=trust
+```
+
 ## SDK integration points
 
 These existing endpoints now update session intelligence without changing their response contracts:
@@ -186,4 +192,3 @@ These existing endpoints now update session intelligence without changing their 
 | `POST /sdk/event` | Evaluates threats once, reduces state, persists, publishes |
 | `POST /sdk/request-decision` | Preserves decision response and updates the session from the event |
 | `GET /sdk/passport` | Returns Phase 3 passport when present; legacy fallback otherwise |
-
