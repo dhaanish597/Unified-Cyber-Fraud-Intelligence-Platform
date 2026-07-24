@@ -1,6 +1,6 @@
 # Trimmed runtime deps for the deployed API (Render free tier, 512MB RAM).
-# Excludes training-only deps (torch, torch_geometric, imbalanced-learn, neo4j,
-# kaggle, pytest) which api/main.py and its imports never touch at request time.
+# Excludes training-only deps (torch, torch_geometric, imbalanced-learn,
+# kaggle, pytest). Neo4j remains a runtime dependency.
 
 pandas==2.2.3
 numpy==2.1.3
@@ -9,11 +9,13 @@ xgboost==2.1.3
 lightgbm==4.5.0
 shap==0.46.0
 networkx==3.4.2
+neo4j==5.26.0
 
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 websockets==14.1
 python-dotenv==1.0.1
 pydantic==2.10.3
+cryptography==44.0.0
 
 reportlab==4.2.5

@@ -17,7 +17,6 @@ RUN pip install --no-cache-dir -r requirements-render.txt
 # Copy API source
 COPY api/ api/
 COPY ml/__init__.py ml/__init__.py
-COPY ml/models/ ml/models/
 COPY ml/features.py ml/features.py
 COPY ml/predict.py ml/predict.py
 COPY graph/ graph/

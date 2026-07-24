@@ -194,31 +194,46 @@ def test_rest_api_and_websocket_bootstrap(
     monkeypatch.setattr(main, "trust_update_broker", TrustUpdateBroker())
 
     with TestClient(main.app) as client:
-        sessions = client.get("/sessions")
+        token_response = client.post(
+            "/auth/token",
+            json={
+                "client_id": "fusion-test",
+                "client_secret": "fusion-test-local-only",
+            },
+        )
+        assert token_response.status_code == 200
+        token = token_response.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        sessions = client.get("/sessions", headers=headers)
         assert sessions.status_code == 200
         assert sessions.json()["sessions"][0]["session_id"] == "SESS_API_TEST"
 
-        passport = client.get("/trust-passport/SESS_API_TEST")
+        passport = client.get("/trust-passport/SESS_API_TEST", headers=headers)
         assert passport.status_code == 200
         assert passport.json()["overall_trust"] == 100.0
         assert passport.json()["composite_trust"] == 100.0
 
-        components = client.get("/trust-components/SESS_API_TEST")
+        components = client.get("/trust-components/SESS_API_TEST", headers=headers)
         assert components.status_code == 200
         assert len(components.json()["components"]) == 9
 
-        history = client.get("/trust-history/SESS_API_TEST?range=last_hour")
+        history = client.get(
+            "/trust-history/SESS_API_TEST?range=last_hour", headers=headers
+        )
         assert history.status_code == 200
         assert history.json()["count"] == 1
 
         recalculated = client.post(
-            "/trust/recalculate", json={"session_id": "SESS_API_TEST"}
+            "/trust/recalculate",
+            json={"session_id": "SESS_API_TEST"},
+            headers=headers,
         )
         assert recalculated.status_code == 200
         assert recalculated.json()["msg_type"] == "trust_passport_update"
 
         with client.websocket_connect(
-            "/ws/stream?session_id=SESS_API_TEST"
+            f"/ws/stream?session_id=SESS_API_TEST&access_token={token}"
         ) as websocket:
             bootstrap = websocket.receive_json()
             assert bootstrap["msg_type"] == "trust_passport_update"

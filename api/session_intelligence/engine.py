@@ -130,9 +130,15 @@ class SessionIntelligenceEngine:
         reasons: list[str] = []
         for threat in threats:
             name = str(threat.get("threat_name", "Unspecified threat"))
-            confidence = max(0.0, min(1.0, float(threat.get("confidence", 0.0)) / 100.0))
+            raw_confidence = threat.get("confidence")
             source = str(threat.get("detection_source", "CyberThreatEngine"))
             impact_map = threat.get("trust_impact") or {}
+            confidence_weighted = raw_confidence is not None
+            confidence = (
+                max(0.0, min(1.0, float(raw_confidence) / 100.0))
+                if confidence_weighted
+                else 1.0
+            )
 
             context.coverage[ComponentName.THREAT].add("cyber_threat_engine")
             severity = str(threat.get("severity", "MEDIUM")).upper()
@@ -143,7 +149,11 @@ class SessionIntelligenceEngine:
                 component=ComponentName.THREAT,
                 impact=threat_impact,
                 confidence=confidence,
-                reason=f"{severity} threat observed: {name}",
+                reason=(
+                    f"{severity} threat observed: {name}"
+                    if confidence_weighted
+                    else f"{severity} threat observed: {name} (declared impact applied without confidence weighting)"
+                ),
                 source=source,
                 observed_at=now,
             )
@@ -159,11 +169,19 @@ class SessionIntelligenceEngine:
                         component=component,
                         impact=max(-60.0, min(0.0, float(raw_impact))),
                         confidence=confidence,
-                        reason=f"{name} affected {component.value} trust",
+                        reason=(
+                            f"{name} affected {component.value} trust"
+                            if confidence_weighted
+                            else f"{name} affected {component.value} trust using declared trust impact"
+                        ),
                         source=source,
                         observed_at=now,
                     )
-            reasons.append(f"{severity} threat observed: {name}")
+            reasons.append(
+                f"{severity} threat observed: {name}"
+                if confidence_weighted
+                else f"{severity} threat observed: {name}; declared trust impact applied without confidence weighting"
+            )
         context.threat_count = len(context.signals[ComponentName.THREAT])
         return reasons
 

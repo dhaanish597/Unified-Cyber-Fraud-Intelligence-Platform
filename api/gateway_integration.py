@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request, HTTPException, Header
 from typing import Optional
 
-from api.pipeline_engine import execute_pipeline
+from api.platform.pipeline import platform_pipeline
 from api.store import put
 
 router = APIRouter(prefix="/gateway", tags=["Gateway Integration"])
@@ -29,9 +29,6 @@ async def gateway_webhook(request: Request, x_razorpay_signature: Optional[str] 
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
         
-    # Store received webhook payloads via api/store.py so the demo can replay them offline
-    put("webhooks", webhook_id, {"headers": dict(request.headers), "body": payload})
-    
     if not secret:
         raise HTTPException(status_code=401, detail="Gateway credentials not configured")
         
@@ -47,36 +44,43 @@ async def gateway_webhook(request: Request, x_razorpay_signature: Optional[str] 
     if not hmac.compare_digest(expected_signature, x_razorpay_signature):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
+    # Persist only after authentication and never store authorization/signature headers.
+    put("webhooks", webhook_id, {"body": payload})
+
     # Normalize the payload into the platform's internal transaction schema
     # Supporting Razorpay format as an example
-    event_type = payload.get("event", "payment.captured")
+    event_type = str(payload.get("event") or payload.get("event_type") or "").upper()
+    if not event_type:
+        raise HTTPException(status_code=422, detail="Gateway event type is required")
     
     amount = 0.0
-    user_id = "usr_webhook"
+    user_id = ""
     txn_id = webhook_id
     
     if "payload" in payload and "payment" in payload["payload"]:
         payment_entity = payload["payload"]["payment"].get("entity", {})
         amount = payment_entity.get("amount", 0.0) / 100.0
-        user_id = payment_entity.get("contact", "usr_webhook")
+        user_id = str(payment_entity.get("contact") or payment_entity.get("customer_id") or "")
         txn_id = payment_entity.get("id", webhook_id)
         
     normalized_txn = {
+        "session_id": f"GATEWAY_{txn_id}",
         "txn_id": txn_id,
         "step": 1,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "type": "TRANSFER",
+        "event_type": event_type,
+        "type": event_type,
         "amount": amount,
-        "nameOrig": f"USER_{user_id}",
+        "nameOrig": user_id,
         "user_id": user_id,
-        "device_id": "webhook_device",
-        "ip": request.client.host if request.client else "127.0.0.1",
-        "oldbalanceOrg": amount,
+        "device_id": payment_entity.get("device_id", "") if "payment_entity" in locals() else "",
+        "ip": request.client.host if request.client else "",
+        "oldbalanceOrg": 0.0,
         "newbalanceOrig": 0.0,
-        "nameDest": "MERCHANT_GATEWAY",
-        "dest_user_id": "merch_gw",
-        "dest_device_id": "none",
-        "dest_ip": "none",
+        "nameDest": payment_entity.get("merchant_id", "") if "payment_entity" in locals() else "",
+        "dest_user_id": "",
+        "dest_device_id": "",
+        "dest_ip": "",
         "oldbalanceDest": 0.0,
         "newbalanceDest": amount,
         "cyber_compromise_in_window": False,
@@ -84,6 +88,8 @@ async def gateway_webhook(request: Request, x_razorpay_signature: Optional[str] 
     }
     
     # Feed it into the real pipeline
-    result = execute_pipeline(normalized_txn)
+    result = await platform_pipeline.process(
+        normalized_txn, require_existing_session=False
+    )
     
-    return {"status": "ok", "pipeline_result": result}
+    return {"status": "ok", "pipeline_result": result.to_dict()}

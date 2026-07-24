@@ -3,9 +3,9 @@ import json
 import sys
 import io
 import datetime
+import hmac
 from pathlib import Path
-import pandas as pd
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -19,9 +19,6 @@ ROOT = Path(__file__).parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from api.risk_engine import evaluate
-from api.pipeline_engine import execute_pipeline
-from api.pipeline_engine import execute_pipeline
 from api.scenario_engine import get_all_scenarios_list, generate_scenario
 from api.synthetic_universe.fraud_scenario_engine import generate_bank_universe
 from api.synthetic_universe.graph_generator import generate_graph_topology
@@ -40,7 +37,17 @@ from api.session_intelligence import (
     session_intelligence,
     trust_update_broker,
 )
-from ml.predict import _get_fusion_model, _prepare_single
+from api.platform import (
+    PlatformSecurityMiddleware,
+    create_access_token,
+    platform_settings,
+)
+from api.platform.observability import RequestContextMiddleware
+from api.platform.security import authenticate_websocket
+from api.platform.graph_runtime import graph_runtime
+from api.platform.model_runtime import model_runtime
+from api.platform.pipeline import PipelineValidationError, platform_pipeline
+from api.platform.decision_runtime import decision_engine
 from api.gateway_integration import router as gateway_router
 
 
@@ -48,21 +55,92 @@ from api.gateway_integration import router as gateway_router
 
 
 
-from ml.features import engineer_features, FEATURE_COLS_FUSION
 
-app = FastAPI()
+app = FastAPI(title="Fusion Risk OS", version="2.5.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(platform_settings.cors_origins),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Razorpay-Signature"],
 )
+app.add_middleware(PlatformSecurityMiddleware)
+app.add_middleware(RequestContextMiddleware)
 
 app.include_router(gateway_router)
 
+
+class TokenRequest(BaseModel):
+    client_id: str
+    client_secret: str
+
+
+@app.post("/auth/token")
+async def issue_platform_token(req: TokenRequest):
+    client = platform_settings.clients.get(req.client_id)
+    supplied = req.client_secret.encode("utf-8")
+    expected = str(client.get("secret", "")).encode("utf-8") if client else b""
+    if not client or not hmac.compare_digest(supplied, expected):
+        raise HTTPException(status_code=401, detail="Invalid client credentials")
+    token, expires_at = create_access_token(req.client_id, client)
+    return {
+        "access_token": token,
+        "token_type": "Bearer",
+        "expires_at": expires_at,
+        "expires_in": platform_settings.jwt_ttl_seconds,
+        "roles": client.get("roles", []),
+    }
+
+
+@app.get("/health/live")
+async def health_live():
+    return {"status": "live", "service": "fusion-risk-os"}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    model_status = model_runtime.status()
+    graph_status = graph_runtime.status()
+    ready = (
+        model_status.get("status") == "AVAILABLE"
+        and graph_status.get("status") == "AVAILABLE"
+        and graph_status.get("backend") == "NEO4J"
+    )
+    return {
+        "status": "ready" if ready else "degraded",
+        "service": "fusion-risk-os",
+        "security_mode": platform_settings.security_mode,
+        "dependencies": {
+            "models": model_status,
+            "graph": graph_status,
+            "database": {"status": "available"},
+        },
+    }
+
+
+@app.get("/platform/status")
+async def platform_status():
+    return {
+        "service": "fusion-risk-os",
+        "version": "2.5.0",
+        "security_mode": platform_settings.security_mode,
+        "models": model_runtime.status(),
+        "graph": graph_runtime.status(),
+        "pipeline": "AUTHORITATIVE_PLATFORM_PIPELINE",
+        "decision_engine": {
+            "implementation": decision_engine.__class__.__name__,
+            "version": decision_engine.version,
+        },
+    }
+
+
+@app.post("/graph/analyze")
+async def analyze_graph(payload: dict):
+    return graph_runtime.process(payload).to_dict()
+
 class TransactionRequest(BaseModel):
+    session_id: str | None = None
     txn_id: str = "txn_0000"
     step: int = 1
     timestamp: str = "2026-01-01 00:00:00"
@@ -90,95 +168,50 @@ class CertInReportRequest(BaseModel):
     reasons: list[str]
     score: float
 
-def get_shap_explanation(txn_dict):
-    try:
-        import shap  # lazy: pulls in numba/llvmlite, too slow/heavy to load at server startup
-
-        model = _get_fusion_model()
-        df = _prepare_single(txn_dict)
-        fe = engineer_features(df)
-        X = fe[FEATURE_COLS_FUSION]
-        
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X)
-        
-        if isinstance(shap_values, list):
-            sv = shap_values[1][0]
-        else:
-            sv = shap_values[0]
-            if len(sv.shape) > 1 and sv.shape[1] == 2:
-                 sv = sv[:, 1]
-            
-        feature_impacts = []
-        for i, col in enumerate(FEATURE_COLS_FUSION):
-            val = float(sv[i])
-            if abs(val) > 0.01:
-                feature_impacts.append({"feature": col, "impact": val})
-                
-        feature_impacts.sort(key=lambda x: abs(x["impact"]), reverse=True)
-        return feature_impacts[:5]
-    except Exception as e:
-        print(f"SHAP error: {e}")
-        return []
-
 @app.post("/evaluate/transaction")
 async def evaluate_transaction(txn: TransactionRequest):
     txn_dict = txn.dict()
-    # Mocking the baseline tabular_score calculation to match the demo exact score requirements:
-    # "with no prior cyber compromise, score = 61 -> CHALLENGE"
-    # "FUSION -> BLOCK, score jumps to ~94"
-    # To force this exactly for the demo, we'll intercept if it's the demo txn.
-    
-    is_demo_txn = txn.amount == 750000.0 and txn.user_id == 'usr_abc'
-    
-    if is_demo_txn:
-        # Force exact demo output
-        reasons = [
-            "High baseline fraud probability (Tabular Score: 0.82)",
-            "Recent cyber compromise detected (Login from unusual IP prior to transfer)",
-            "Beneficiary is part of a known mule cluster (cluster_alpha)"
-        ]
-        return {
-            "action": "BLOCK",
-            "score": 94.0,
-            "reasons": reasons,
-            "shap_features": [
-                {"feature": "log_amount", "impact": 1.2},
-                {"feature": "cyber_flag", "impact": 2.1},
-                {"feature": "dest_balance_ratio", "impact": 0.8},
-                {"feature": "time_since_last_txn", "impact": -0.4}
-            ],
-            "counterfactual_sentence": "Counterfactual: With no prior cyber compromise, score = 61 -> CHALLENGE, not BLOCK."
-        }
-    
-    # Regular evaluation for non-demo transactions
-    result = evaluate(txn_dict)
-    shap_features = get_shap_explanation(txn_dict)
-    
-    counterfactual_sentence = ""
-    if result.get("counterfactual"):
-        cf = result["counterfactual"]
-        counterfactual_sentence = f"Counterfactual: With no prior cyber compromise, score = {cf['score']:.0f} -> {cf['action']}, not {result['action']}."
-    
+    txn_dict["session_id"] = txn.session_id or f"TXN_CONTEXT_{txn.txn_id}"
+    txn_dict["event_type"] = "TRANSACTION_EVALUATION"
+    result = await platform_pipeline.process(
+        txn_dict, require_existing_session=False
+    )
     return {
-        "action": result["action"],
-        "score": result["score"],
-        "reasons": result["reasons"],
-        "shap_features": shap_features,
-        "counterfactual_sentence": counterfactual_sentence
+        "action": result.decision["decision"],
+        "score": result.inference["score"],
+        "reasons": result.inference["reasons"],
+        "model_status": result.inference["status"],
+        "model_used": (
+            result.inference["implementation"]
+            if result.inference["status"] == "EXECUTED"
+            else None
+        ),
+        "fallback_used": (
+            result.inference["implementation"]
+            if result.inference["status"] == "FALLBACK"
+            else None
+        ),
+        "graph": result.graph,
+        "threats": result.threats,
+        "pipeline_id": result.pipeline_id,
     }
 
 @app.post("/evaluate/transaction/pipeline")
 async def evaluate_transaction_pipeline(txn: TransactionRequest):
     txn_dict = txn.dict()
-    pipeline_result = execute_pipeline(txn_dict)
-    return pipeline_result
+    txn_dict["session_id"] = txn.session_id or f"TXN_CONTEXT_{txn.txn_id}"
+    txn_dict["event_type"] = "TRANSACTION_EVALUATION"
+    return (
+        await platform_pipeline.process(txn_dict, require_existing_session=False)
+    ).to_dict()
 
 @app.post("/evaluate/transaction/trust")
 async def evaluate_transaction_trust(txn: TransactionRequest):
-    txn_dict = txn.dict()
-    pipeline_result = execute_pipeline(txn_dict)
-    return pipeline_result.get("trust_metrics", {})
+    return {
+        "status": "UNAVAILABLE",
+        "reason": "LEGACY_SYNTHETIC_TRUST_DISABLED",
+        "message": "Phase 2.5 does not calculate or expose synthetic trust metrics.",
+    }
 
 @app.get("/scenarios/list")
 async def list_scenarios():
@@ -350,6 +383,12 @@ async def export_synthetic_replay(num_customers: int = 100, num_txns: int = 500,
 # --- QUANTUM MONITORING ---
 @app.get("/quantum/posture")
 async def get_quantum_posture():
+    return {
+        "status": "UNAVAILABLE",
+        "vulnerable_percent": None,
+        "hndl_flag": None,
+        "reason": "TLS_HANDSHAKE_TELEMETRY_NOT_CONFIGURED",
+    }
     """
     Returns the % of vulnerable sessions and a Harvest-Now-Decrypt-Later (HNDL) flag.
     In the demo, the current session used ECDHE, flagging HNDL.
@@ -854,15 +893,20 @@ async def simulate_quantum_threat(req: QuantumSimulateRequest):
 
 
 async def websocket_endpoint(websocket: WebSocket):
+    try:
+        authenticate_websocket(websocket)
+    except HTTPException as exc:
+        await websocket.close(code=4401, reason=str(exc.detail))
+        return
     await websocket.accept()
     session_filter = websocket.query_params.get("session_id")
     trust_only = websocket.query_params.get("stream") == "trust"
     subscription = await trust_update_broker.subscribe(session_filter)
 
     try:
-        # Session-scoped SDK clients receive a current Trust Passport bootstrap
-        # and then only live trust updates. Existing unscoped dashboard clients
-        # retain the original scripted replay before entering live mode.
+        # Session-scoped clients receive current state before live updates.
+        # Unscoped clients receive only events produced by the authoritative
+        # pipeline; no synthetic replay is injected into a production stream.
         if session_filter:
             passport = session_intelligence.repository.get_passport(session_filter)
             if passport:
@@ -873,46 +917,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     "passport": passport.to_compatible_dict(),
                     "deltas": [],
                 })
-        elif not trust_only:
-            for event in get_demo_events():
-                delay = event.pop("delay", 1.0)
-                await websocket.send_json(event)
-
-                user_id = event.get("user_id", "usr_abc")
-                twin = get_or_create_digital_twin(user_id)
-                twin.update_twin(event)
-
-                if event.get("msg_type") == "transaction":
-                    try:
-                        pipeline_data = execute_pipeline(event)
-                        await websocket.send_json({
-                            "msg_type": "pipeline_overview",
-                            "data_flow": pipeline_data["data_flow"],
-                            "checklist_summary": pipeline_data["checklist_summary"],
-                            "composite_score": pipeline_data["composite_score"],
-                            "action": pipeline_data["action"],
-                        })
-                        for stage in pipeline_data["stages"]:
-                            await websocket.send_json({
-                                "msg_type": "pipeline_stage",
-                                "txn_id": pipeline_data["txn_id"],
-                                "stage_id": stage["stage_id"],
-                                "stage_index": stage["stage_index"],
-                                "name": stage["name"],
-                                "summary": stage["summary"],
-                                "checklist_item": stage["checklist_item"],
-                                "status": stage["status"],
-                                "evidence": stage["evidence"],
-                            })
-                            await asyncio.sleep(0.08)
-                    except Exception as exc:
-                        # Preserve the stream for live trust subscribers even if
-                        # optional model artifacts for the legacy replay are absent.
-                        await websocket.send_json({
-                            "msg_type": "pipeline_error",
-                            "error": str(exc),
-                        })
-                await asyncio.sleep(delay)
 
         while True:
             receive_task = asyncio.create_task(websocket.receive_text())
@@ -945,57 +949,59 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # --- FUSION ADAPTIVE TRUST SDK (FAT-SDK) ENDPOINTS ---
 class SDKSessionStartRequest(BaseModel):
-    app_id: str = "com.fusionbank.mobileapp"
-    tenant_id: str = "TENANT_FUSB_001"
-    sdk_version: str = "FAT-SDK v2.4.1"
-    user_id: str = "usr_sdk_demo"
-    device_id: str = "DEV_12345"
-    environment: str = "PRODUCTION"
+    app_id: str
+    tenant_id: str
+    sdk_version: str
+    user_id: str
+    device_id: str
+    environment: str
 
 class SDKDeviceRequest(BaseModel):
-    device_id: str = "DEV_12345"
-    model: str = "Samsung Galaxy S24"
-    manufacturer: str = "Samsung"
-    android_version: str = "14"
-    security_patch: str = "2026-07-01"
-    screen_lock_enabled: bool = True
-    root_detected: bool = False
-    emulator_detected: bool = False
-    frida_detected: bool = False
-    debugger_attached: bool = False
-    overlay_detected: bool = False
-    timezone: str = "Asia/Kolkata"
-    locale: str = "en_IN"
+    device_id: str
+    model: str
+    manufacturer: str
+    android_version: str
+    security_patch: str
+    screen_lock_enabled: bool
+    root_detected: bool
+    emulator_detected: bool
+    frida_detected: bool
+    debugger_attached: bool
+    overlay_detected: bool
+    timezone: str
+    locale: str
 
 class SDKNetworkRequest(BaseModel):
-    session_id: str = "SDK_SESS_DEMO"
-    network_type: str = "CELLULAR_5G"
-    carrier: str = "Jio"
-    vpn_detected: bool = False
-    proxy_detected: bool = False
-    roaming: bool = False
-    wifi_vs_cellular: str = "CELLULAR"
+    session_id: str
+    network_type: str
+    carrier: str
+    vpn_detected: bool
+    proxy_detected: bool
+    roaming: bool
+    wifi_vs_cellular: str
 
 class SDKEventRequest(BaseModel):
-    session_id: str = "SDK_SESS_DEMO"
-    device_id: str = "DEV_12345"
-    event_type: str = "USER_LOGIN"
+    session_id: str
+    device_id: str
+    event_type: str
     amount: float = 0.0
-    composite_trust: float = 82.0
     sdk_version: str = "FAT-SDK v2.4.1"
 
 class SDKDecisionRequest(BaseModel):
-    session_id: str = "SDK_SESS_DEMO"
-    event_type: str = "TRANSFER_INITIATED"
-    amount: float = 75000.0
-    composite_trust: float = 82.0
+    session_id: str
+    event_type: str
+    amount: float
     vpn_detected: bool = False
     root_detected: bool = False
-    runtime_trust: float = 94.0
 
 @app.post("/sdk/session/start")
-async def sdk_session_start(req: SDKSessionStartRequest):
-    session = sdk_engine.start_session(req.dict())
+async def sdk_session_start(req: SDKSessionStartRequest, request: Request):
+    auth = request.state.auth
+    if auth.app_id and auth.app_id != req.app_id:
+        raise HTTPException(status_code=403, detail="Token is not scoped to this application")
+    if auth.tenant_id and auth.tenant_id != req.tenant_id:
+        raise HTTPException(status_code=403, detail="Token is not scoped to this tenant")
+    session = sdk_engine.start_session(req.model_dump())
     device_profile = sdk_engine.device_profiles.get(session["device_id"], {})
     device_event = {
         **device_profile,
@@ -1011,45 +1017,79 @@ async def sdk_session_start(req: SDKSessionStartRequest):
 
 @app.post("/sdk/device")
 async def sdk_register_device(req: SDKDeviceRequest):
-    return sdk_engine.register_device(req.dict())
+    return sdk_engine.register_device(req.model_dump())
 
 @app.post("/sdk/network")
 async def sdk_register_network(req: SDKNetworkRequest):
-    event = {**req.dict(), "event_type": "NETWORK_ATTESTATION"}
-    response = sdk_engine.register_network(req.dict())
-    threats = cyber_threat_engine.evaluate_event(event)
-    update = session_intelligence.process_event(event, threats)
-    await trust_update_broker.publish(update.model_dump(mode="json"))
+    response = sdk_engine.register_network(req.model_dump())
+    session = sdk_engine.sdk_sessions.get(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="SDK session is not active")
+    event = {
+        **req.model_dump(),
+        "event_type": "NETWORK_ATTESTATION",
+        "user_id": session["user_id"],
+        "device_id": session["device_id"],
+    }
+    await platform_pipeline.process(event, require_existing_session=True)
     return response
 
 @app.post("/sdk/event")
 async def sdk_ingest_event(req: SDKEventRequest):
-    event_dict = req.dict()
-    res = sdk_engine.ingest_event(event_dict)
-    threats = cyber_threat_engine.evaluate_event(event_dict)
-    update = session_intelligence.process_event(event_dict, threats)
-    await trust_update_broker.publish(update.model_dump(mode="json"))
-    return res
+    event_dict = req.model_dump()
+    session = sdk_engine.sdk_sessions.get(req.session_id)
+    if session:
+        event_dict["user_id"] = session["user_id"]
+    try:
+        result = await platform_pipeline.process(
+            event_dict, require_existing_session=True
+        )
+    except PipelineValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return result.event_ack
 
 @app.post("/sdk/request-decision")
 async def sdk_request_decision(req: SDKDecisionRequest):
-    dec_dict = req.dict()
-    res = sdk_engine.request_decision(dec_dict)
-    threats = cyber_threat_engine.evaluate_event(dec_dict)
-    update = session_intelligence.process_event(dec_dict, threats)
-    await trust_update_broker.publish(update.model_dump(mode="json"))
-    return res
+    dec_dict = req.model_dump()
+    session = sdk_engine.sdk_sessions.get(req.session_id)
+    if session:
+        dec_dict["user_id"] = session["user_id"]
+        dec_dict["device_id"] = session["device_id"]
+    try:
+        result = await platform_pipeline.process(
+            dec_dict, require_existing_session=True
+        )
+    except PipelineValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    decision = result.decision
+    return {
+        **decision,
+        "recommended_action": decision["decision"].replace("_", " ").title(),
+        "policy_version": sdk_engine.policy_version,
+        "decision_latency_ms": result.timings["total_ms"],
+        "pipeline_id": result.pipeline_id,
+        "model_used": (
+            result.inference["implementation"]
+            if result.inference["status"] == "EXECUTED"
+            else None
+        ),
+        "fallback_used": (
+            result.inference["implementation"]
+            if result.inference["status"] == "FALLBACK"
+            else None
+        ),
+    }
 
 @app.get("/sdk/policies")
 async def sdk_get_policies():
     return sdk_engine.get_policies()
 
 @app.get("/sdk/passport")
-async def sdk_get_passport(session_id: str = "SDK_SESS_DEMO"):
+async def sdk_get_passport(session_id: str):
     passport = session_intelligence.repository.get_passport(session_id)
     if passport:
         return passport.to_compatible_dict()
-    return sdk_engine.get_trust_passport(session_id)
+    raise HTTPException(status_code=404, detail="No authoritative trust passport for session")
 
 @app.get("/sdk/health")
 async def sdk_get_health():
@@ -1134,13 +1174,24 @@ async def get_threats_by_device(device_id: str):
 
 @app.post("/threats/evaluate")
 async def evaluate_threat_event(event: dict):
-    threats = cyber_threat_engine.evaluate_event(event)
-    return {"status": "SUCCESS", "evaluated_threats": threats, "count": len(threats)}
+    result = await platform_pipeline.process(event, require_existing_session=False)
+    return {
+        "status": "SUCCESS",
+        "evaluated_threats": result.threats,
+        "count": len(result.threats),
+        "graph": result.graph,
+        "pipeline_id": result.pipeline_id,
+    }
 
 @app.post("/threats/simulate")
 async def simulate_threat_scenario(payload: dict):
-    threats = cyber_threat_engine.evaluate_event(payload)
-    return {"status": "SIMULATED", "threats": threats}
+    result = await platform_pipeline.process(payload, require_existing_session=False)
+    return {
+        "status": "SIMULATED",
+        "threats": result.threats,
+        "graph": result.graph,
+        "pipeline_id": result.pipeline_id,
+    }
 
 
 if __name__ == "__main__":

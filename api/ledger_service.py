@@ -16,15 +16,23 @@ class LedgerService:
     """
     def __init__(self):
         env_key = os.environ.get("LEDGER_SIGNING_KEY")
+        production = os.environ.get("FUSION_SECURITY_MODE", "development").lower() == "production"
+        self.key_source = "CONFIGURED"
         if env_key:
             try:
                 self.private_key = ed25519.Ed25519PrivateKey.from_private_bytes(bytes.fromhex(env_key))
             except Exception as e:
-                logging.warning(f"Failed to load LEDGER_SIGNING_KEY: {e}. Generating ephemeral.")
+                if production:
+                    raise RuntimeError("LEDGER_SIGNING_KEY is invalid in production") from e
+                logging.warning("LEDGER_SIGNING_KEY is invalid; using a development-only ephemeral key.")
                 self.private_key = ed25519.Ed25519PrivateKey.generate()
+                self.key_source = "EPHEMERAL_DEVELOPMENT"
         else:
+            if production:
+                raise RuntimeError("LEDGER_SIGNING_KEY is required in production")
             self.private_key = ed25519.Ed25519PrivateKey.generate()
-            logging.warning("LEDGER_SIGNING_KEY not set. Generated ephemeral Ed25519 key.")
+            self.key_source = "EPHEMERAL_DEVELOPMENT"
+            logging.warning("LEDGER_SIGNING_KEY not set; using a development-only ephemeral key.")
             
         self.public_key = self.private_key.public_key()
         
@@ -71,8 +79,7 @@ class LedgerService:
 
         chain_of_custody = [
             {"step": "COLLECTED", "timestamp": timestamp, "actor": "SIEM_Stream_Ingest", "detail": "Raw transaction & cyber telemetry captured"},
-            {"step": "ANALYZED", "timestamp": timestamp, "actor": "Fusion_Risk_OS_AI", "detail": "Multi-modal scoring & SHAP feature extraction complete"},
-            {"step": "ATTACHED", "timestamp": timestamp, "actor": "Evidence_Locker", "detail": "Graph snapshot & counterfactual sentence attached"},
+            {"step": "ANALYZED", "timestamp": timestamp, "actor": "Fusion_Risk_OS", "detail": "Recorded pipeline evidence attached"},
             {"step": "VERDICT_LOCKED", "timestamp": timestamp, "actor": "Decision_Engine", "detail": "Decision policy rule enforced"},
             {"step": "HASHED", "timestamp": timestamp, "actor": "SHA256_Hasher", "detail": f"Canonical digest generated: {sha256_hash[:16]}..."},
             {"step": "SIGNED", "timestamp": timestamp, "actor": "Ed25519_Signer", "detail": "Ed25519 Digital Signature applied"},

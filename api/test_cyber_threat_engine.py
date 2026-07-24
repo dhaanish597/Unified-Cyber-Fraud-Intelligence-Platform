@@ -15,7 +15,8 @@ def test_device_threat_detection():
     assert root_threat is not None
     assert root_threat["severity"] == "CRITICAL"
     assert root_threat["confidence"] >= 90.0
-    assert "su binary found" in root_threat["evidence"][0]
+    assert {"field": "root_detected", "observed_value": True} in root_threat["evidence"]
+    assert root_threat["confidence_basis"]["method"] == "OBSERVED_EVIDENCE_COVERAGE"
 
 def test_frida_runtime_threat():
     engine = CyberThreatEngine()
@@ -41,7 +42,8 @@ def test_campaign_correlation():
     campaign = next((t for t in threats if t["threat_category"] == "Campaign Correlation"), None)
     assert campaign is not None
     assert "ACCOUNT TAKEOVER" in campaign["threat_name"]
-    assert campaign["confidence"] >= 99.0
+    assert campaign["confidence"] == 100.0
+    assert campaign["confidence_basis"]["method"] == "MEAN_CORRELATED_FINDING_CONFIDENCE"
 
 if __name__ == "__main__":
     test_device_threat_detection()

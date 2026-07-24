@@ -1,7 +1,6 @@
 import time
 import datetime
 import uuid
-import random
 from typing import Dict, List, Any, Optional
 
 class CyberThreatEngine:
@@ -19,8 +18,6 @@ class CyberThreatEngine:
         self.device_threat_index: Dict[str, List[str]] = {}
         self.historical_threats: List[dict] = []
         
-        # Pre-seed realistic threat store for immediate SOC demo capability
-        self._seed_initial_threats()
 
     def evaluate_event(self, event_data: dict) -> List[dict]:
         """
@@ -51,13 +48,16 @@ class CyberThreatEngine:
                        ses_threats + beh_threats + idn_threats + txn_threats + grp_threats)
 
         for item in raw_threats:
-            threat_obj = self._build_threat_object(item, session_id, device_id, user_id, t0)
+            threat_obj = self._build_threat_object(
+                item, session_id, device_id, user_id, t0, event_data
+            )
             self._save_threat(threat_obj)
             detected_threats.append(threat_obj)
 
         # Multi-Threat Campaign Correlation
-        correlated_campaigns = self._correlate_campaigns(session_id, device_id)
+        correlated_campaigns = self._correlate_campaigns(session_id, device_id, t0)
         for campaign in correlated_campaigns:
+            self._save_threat(campaign)
             detected_threats.append(campaign)
 
         return detected_threats
@@ -75,8 +75,6 @@ class CyberThreatEngine:
                 "threat_name": "Rooted Operating System / SU Binary Detected",
                 "threat_category": "Device Threats",
                 "severity": "CRITICAL",
-                "confidence_base": 98.0,
-                "confidence_explanation": "Direct binary inspection confirmed Superuser su binary or Magisk mount path in /system/xbin/su.",
                 "evidence": [
                     "su binary found at /system/xbin/su",
                     "Magisk hide daemon detected in memory",
@@ -92,8 +90,6 @@ class CyberThreatEngine:
                 "threat_name": "Android Hardware Emulator Execution",
                 "threat_category": "Device Threats",
                 "severity": "HIGH",
-                "confidence_base": 95.0,
-                "confidence_explanation": "Build fingerprint mismatch and QEMU virtual driver presence confirmed non-physical hardware.",
                 "evidence": [
                     "Build fingerprint: generic/google_sdk/x86",
                     "QEMU hypervisor driver present (/dev/qemu_pipe)",
@@ -117,8 +113,6 @@ class CyberThreatEngine:
                 "threat_name": "Frida Dynamic Instrumentation Framework Active",
                 "threat_category": "Runtime Threats",
                 "severity": "CRITICAL",
-                "confidence_base": 99.0,
-                "confidence_explanation": "Port scan detected Frida server listening on 27042 and in-memory frida-agent.so thread injection.",
                 "evidence": [
                     "TCP port 27042 listening (Frida RPC Server)",
                     "In-memory library hook detected: frida-agent.so",
@@ -134,8 +128,6 @@ class CyberThreatEngine:
                 "threat_name": "Active Debugger Attached to Banking Process",
                 "threat_category": "Runtime Threats",
                 "severity": "HIGH",
-                "confidence_base": 94.0,
-                "confidence_explanation": "Process ptrace state indicates active ptrace attach from external process.",
                 "evidence": [
                     "android.os.Debug.isDebuggerConnected() returned TRUE",
                     "TracerPid in /proc/self/status is non-zero (PID 4821)",
@@ -158,8 +150,6 @@ class CyberThreatEngine:
                 "threat_name": "Malicious Window Overlay & Accessibility Service Abuse",
                 "threat_category": "Overlay Attacks",
                 "severity": "CRITICAL",
-                "confidence_base": 97.0,
-                "confidence_explanation": "An untrusted third-party app enabled Accessibility Service permissions and rendered a transparent overlay over payment views.",
                 "evidence": [
                     "Accessibility Service active: com.malware.overlay.service",
                     "SYSTEM_ALERT_WINDOW active over payment composables",
@@ -182,8 +172,6 @@ class CyberThreatEngine:
                 "threat_name": "Anonymizing Network / VPN Tunnel Active",
                 "threat_category": "Network Threats",
                 "severity": "MEDIUM",
-                "confidence_base": 91.0,
-                "confidence_explanation": "TUN/TAP network interface active and IP route maps to known commercial VPN data center ASN.",
                 "evidence": [
                     "Network interface tun0 active (10.8.0.2)",
                     "ASN changed to AS14061 (DigitalOcean / VPN Provider)",
@@ -204,8 +192,6 @@ class CyberThreatEngine:
                 "threat_name": "Session Hijack & Concurrent IP Access Anomaly",
                 "threat_category": "Session Threats",
                 "severity": "HIGH",
-                "confidence_base": 93.0,
-                "confidence_explanation": "Active session token used simultaneously from two distinct IP subnets 450 km apart.",
                 "evidence": [
                     "Active IP 1: 49.37.12.89 (Mumbai, India)",
                     "Active IP 2: 185.220.101.4 (Frankfurt, Germany)",
@@ -226,8 +212,6 @@ class CyberThreatEngine:
                 "threat_name": "Automated Scripting & Robotic Touch Biometrics",
                 "threat_category": "Behaviour Threats",
                 "severity": "HIGH",
-                "confidence_base": 92.0,
-                "confidence_explanation": "Touch pressure variance is 0.00 and inter-tap delay is exactly 120.0ms, indicating automated script execution.",
                 "evidence": [
                     "Touch pressure variance: 0.000 (Human average > 0.12)",
                     "Tap interval standard deviation: 0.02ms (Robotic precision)",
@@ -248,8 +232,6 @@ class CyberThreatEngine:
                 "threat_name": "Impossible Travel & Geofence Anomaly",
                 "threat_category": "Identity Threats",
                 "severity": "CRITICAL",
-                "confidence_base": 96.0,
-                "confidence_explanation": "Physical distance between consecutive logins requires minimum travel speed of 1,450 km/h.",
                 "evidence": [
                     "Location t0 (22:45 IST): Delhi, India (IP 122.160.1.4)",
                     "Location t1 (22:49 IST): London, UK (IP 81.2.69.142)",
@@ -272,8 +254,6 @@ class CyberThreatEngine:
                 "threat_name": "High-Value Velocity Surge Transaction Risk",
                 "threat_category": "Transaction Threats",
                 "severity": "HIGH" if amount < 200000 else "CRITICAL",
-                "confidence_base": 89.0,
-                "confidence_explanation": "Transfer amount ₹" + f"{amount:,.2f}" + " exceeds standard user 30-day baseline average by >400%.",
                 "evidence": [
                     f"Requested Amount: ₹{amount:,.2f}",
                     "User 30-day baseline average: ₹12,400.00",
@@ -288,39 +268,84 @@ class CyberThreatEngine:
     # CATEGORY 9: Graph Threats
     def _eval_graph_threats(self, data: dict) -> List[dict]:
         threats = []
-        event_type = data.get("event_type", "")
-        if event_type in ["MULE_CLUSTER_CORRELATION", "SHARED_DEVICE_ANOMALY", "FRAUD_RING_LINK"]:
+        graph_findings = data.get("_graph_findings") or []
+        for finding in graph_findings:
+            finding_type = finding.get("finding_type")
+            if finding_type not in {
+                "SHARED_DEVICE",
+                "SHARED_BENEFICIARY",
+                "CIRCULAR_TRANSFER",
+                "FRAUD_RING_CANDIDATE",
+            }:
+                continue
             threats.append({
-                "threat_name": "Mule Account & Graph Fraud Ring Association",
+                "threat_name": f"Graph Intelligence Finding: {finding_type}",
                 "threat_category": "Graph Threats",
-                "severity": "CRITICAL",
-                "confidence_base": 98.0,
-                "confidence_explanation": "Beneficiary account is a central node in mule cluster cluster_alpha with betweenness centrality 0.88.",
-                "evidence": [
-                    "Beneficiary node ID: usr_mule_cluster_alpha",
-                    "Graph Cluster ID: cluster_alpha (Known Mule Network)",
-                    "PageRank centrality score: 0.94 (Top 0.1% risk tier)"
-                ],
-                "detection_source": "Fusion GraphSAGE & Centrality Engine",
+                "severity": finding.get("severity", "HIGH"),
+                "evidence": finding.get("evidence", []),
+                "detection_source": f"Fusion Graph Intelligence ({data.get('_graph_backend', 'UNKNOWN')})",
                 "trust_impact": {"graph_trust": -50.0},
                 "recommended_action": "BLOCK_TRANSACTION"
             })
         return threats
 
     # Threat Object Builder & Model
-    def _build_threat_object(self, item: dict, session_id: str, device_id: str, user_id: str, t0: float) -> dict:
-        latency_ms = round((time.perf_counter() - t0) * 1000.0 + random.uniform(2.0, 8.0), 2)
+    def _build_threat_object(
+        self,
+        item: dict,
+        session_id: str,
+        device_id: str,
+        user_id: str,
+        t0: float,
+        event_data: dict,
+    ) -> dict:
+        latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         threat_id = f"THR_{uuid.uuid4().hex[:8].upper()}"
-        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")
+        ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        observed_evidence = []
+        for key, value in event_data.items():
+            if key.startswith("_") or key in {"composite_trust", "sdk_version"}:
+                continue
+            if value is True or key in {
+                "event_type",
+                "device_id",
+                "session_id",
+                "user_id",
+                "network_type",
+                "carrier",
+            }:
+                observed_evidence.append({"field": key, "observed_value": value})
+        if float(event_data.get("amount", 0.0) or 0.0) > 0:
+            observed_evidence.append(
+                {"field": "amount", "observed_value": float(event_data["amount"])}
+            )
+        if item["threat_category"] == "Graph Threats":
+            observed_evidence = list(item.get("evidence") or [])
+        direct_indicators = [
+            evidence
+            for evidence in observed_evidence
+            if evidence.get("field") not in {"event_type", "device_id", "session_id", "user_id"}
+        ]
+        confidence = 100.0 if direct_indicators else None
+        confidence_explanation = (
+            f"{len(direct_indicators)} direct telemetry indicator(s) supported the rule."
+            if direct_indicators
+            else "Not available: only an event classification was supplied."
+        )
         
         return {
             "threat_id": threat_id,
             "threat_name": item["threat_name"],
             "threat_category": item["threat_category"],
             "severity": item["severity"],
-            "confidence": item["confidence_base"],
-            "confidence_explanation": item["confidence_explanation"],
-            "evidence": item["evidence"],
+            "confidence": confidence,
+            "confidence_explanation": confidence_explanation,
+            "confidence_basis": {
+                "method": "OBSERVED_EVIDENCE_COVERAGE",
+                "direct_indicator_count": len(direct_indicators),
+                "event_label_present": bool(event_data.get("event_type")),
+            },
+            "evidence": observed_evidence,
             "session_id": session_id,
             "device_id": device_id,
             "user_id": user_id,
@@ -332,7 +357,9 @@ class CyberThreatEngine:
             "detection_latency_ms": latency_ms
         }
 
-    def _correlate_campaigns(self, session_id: str, device_id: str) -> List[dict]:
+    def _correlate_campaigns(
+        self, session_id: str, device_id: str, t0: float
+    ) -> List[dict]:
         """
         Correlates multiple active threats into high-level attack campaign objects.
         """
@@ -344,27 +371,60 @@ class CyberThreatEngine:
 
         # Campaign Rule 1: Account Takeover
         if "Identity Threats" in categories and "Network Threats" in categories:
+            existing = any(
+                threat.get("threat_category") == "Campaign Correlation"
+                and threat.get("threat_name") == "ACCOUNT TAKEOVER CAMPAIGN"
+                for threat in threat_objs
+            )
+            if existing:
+                return campaigns
+            inputs = [
+                threat
+                for threat in threat_objs
+                if threat["threat_category"] in {"Identity Threats", "Network Threats"}
+            ]
+            measured_confidences = [
+                float(threat["confidence"])
+                for threat in inputs
+                if threat.get("confidence") is not None
+            ]
+            confidence = (
+                round(sum(measured_confidences) / len(measured_confidences), 2)
+                if measured_confidences
+                else None
+            )
             campaigns.append({
                 "threat_id": f"CAMPAIGN_{uuid.uuid4().hex[:8].upper()}",
-                "threat_name": "HIGH-CONFIDENCE ACCOUNT TAKEOVER (ATO) CAMPAIGN",
+                "threat_name": "ACCOUNT TAKEOVER CAMPAIGN",
                 "threat_category": "Campaign Correlation",
                 "severity": "CRITICAL",
-                "confidence": 99.5,
-                "confidence_explanation": "Correlated Impossible Travel, New Device, and VPN Tunnel active in a single session window.",
+                "confidence": confidence,
+                "confidence_explanation": (
+                    "Arithmetic mean of correlated findings with measured confidence."
+                    if measured_confidences
+                    else "Not available: correlated findings had no measured confidence."
+                ),
+                "confidence_basis": {
+                    "method": "MEAN_CORRELATED_FINDING_CONFIDENCE",
+                    "input_threat_ids": [threat["threat_id"] for threat in inputs],
+                },
                 "evidence": [
-                    "Correlated Threat 1: Impossible Travel Geofence Anomaly",
-                    "Correlated Threat 2: Anonymizing VPN Tunnel Active",
-                    "Correlated Threat 3: Unrecognized Hardware Device"
+                    {
+                        "threat_id": threat["threat_id"],
+                        "category": threat["threat_category"],
+                        "confidence": threat["confidence"],
+                    }
+                    for threat in inputs
                 ],
                 "session_id": session_id,
                 "device_id": device_id,
-                "user_id": "usr_sdk_demo",
-                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S IST"),
+                "user_id": inputs[0].get("user_id", "unknown"),
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "detection_source": "Fusion Multi-Threat Correlation Engine",
                 "trust_impact": {"overall_trust": -60.0},
                 "recommended_action": "BLOCK_TRANSACTION",
                 "status": "ACTIVE",
-                "detection_latency_ms": 14.2
+                "detection_latency_ms": round((time.perf_counter() - t0) * 1000.0, 3),
             })
         return campaigns
 
@@ -400,97 +460,6 @@ class CyberThreatEngine:
     def get_threats_by_device(self, device_id: str) -> List[dict]:
         tids = self.device_threat_index.get(device_id, [])
         return [self.threat_store[t] for t in tids if t in self.threat_store]
-
-    def _seed_initial_threats(self):
-        """Seed realistic enterprise threat data for immediate demo readiness."""
-        demo_threats = [
-            {
-                "threat_name": "Active Accessibility & Window Overlay Hijacking",
-                "threat_category": "Overlay Attacks",
-                "severity": "CRITICAL",
-                "confidence_base": 97.5,
-                "confidence_explanation": "Detected active Accessibility Service overlay combined with SYSTEM_ALERT_WINDOW during payment flow.",
-                "evidence": [
-                    "Accessibility Service active: com.malware.remote.access",
-                    "SYSTEM_ALERT_WINDOW rendered over payment composables",
-                    "Screen capture flags disabled by external package"
-                ],
-                "detection_source": "FAT-SDK Screen Protection Guard",
-                "trust_impact": {"device_trust": -30.0, "runtime_trust": -40.0},
-                "recommended_action": "TERMINATE_SESSION"
-            },
-            {
-                "threat_name": "Frida Dynamic Instrumentation Framework Active",
-                "threat_category": "Runtime Threats",
-                "severity": "CRITICAL",
-                "confidence_base": 99.0,
-                "confidence_explanation": "TCP port 27042 active and in-memory frida-agent.so thread hook detected.",
-                "evidence": [
-                    "TCP port 27042 listening (Frida RPC Server)",
-                    "In-memory library hook detected: frida-agent.so",
-                    "Method hooking detected on java.security.Signature"
-                ],
-                "detection_source": "FAT-SDK Runtime Integrity Guard",
-                "trust_impact": {"runtime_trust": -45.0},
-                "recommended_action": "TERMINATE_SESSION"
-            },
-            {
-                "threat_name": "Impossible Travel & Geofence Anomaly",
-                "threat_category": "Identity Threats",
-                "severity": "CRITICAL",
-                "confidence_base": 96.0,
-                "confidence_explanation": "Session jumped 6,700 km from Delhi to London in 4 minutes (1,450 km/h).",
-                "evidence": [
-                    "Location t0: Delhi, India (122.160.1.4)",
-                    "Location t1: London, UK (81.2.69.142)",
-                    "Velocity: 1,450 km/h (Exceeds aircraft bounds)"
-                ],
-                "detection_source": "Fusion Identity Intelligence Engine",
-                "trust_impact": {"identity_trust": -40.0},
-                "recommended_action": "BLOCK_TRANSACTION"
-            },
-            {
-                "threat_name": "Anonymizing Network / VPN Tunnel Active",
-                "threat_category": "Network Threats",
-                "severity": "MEDIUM",
-                "confidence_base": 91.0,
-                "confidence_explanation": "TUN/TAP interface active; ASN maps to commercial VPN provider.",
-                "evidence": [
-                    "Network interface tun0 active (10.8.0.2)",
-                    "ASN changed to AS14061 (DigitalOcean / VPN Provider)",
-                    "DNS server mismatch with local ISP carrier"
-                ],
-                "detection_source": "FAT-SDK Network Intelligence Monitor",
-                "trust_impact": {"network_trust": -25.0},
-                "recommended_action": "REQUIRE_OTP"
-            },
-            {
-                "threat_name": "Mule Account & Graph Fraud Ring Association",
-                "threat_category": "Graph Threats",
-                "severity": "CRITICAL",
-                "confidence_base": 98.0,
-                "confidence_explanation": "Beneficiary node is a central node in mule cluster cluster_alpha.",
-                "evidence": [
-                    "Beneficiary node ID: usr_mule_cluster_alpha",
-                    "Graph Cluster ID: cluster_alpha (Known Mule Network)",
-                    "Betweenness centrality score: 0.88"
-                ],
-                "detection_source": "Fusion GraphSAGE & Centrality Engine",
-                "trust_impact": {"graph_trust": -50.0},
-                "recommended_action": "BLOCK_TRANSACTION"
-            }
-        ]
-
-        t0 = time.perf_counter()
-        for idx, item in enumerate(demo_threats):
-            obj = self._build_threat_object(
-                item,
-                session_id=f"SDK_SESS_DEMO_00{idx+1}",
-                device_id=f"DEV_DEMO_00{idx+1}",
-                user_id=f"usr_demo_00{idx+1}",
-                t0=t0
-            )
-            self._save_threat(obj)
 
 # Singleton Instance
 cyber_threat_engine = CyberThreatEngine()
