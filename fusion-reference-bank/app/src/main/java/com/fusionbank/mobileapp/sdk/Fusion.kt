@@ -187,27 +187,23 @@ object Fusion {
         scope.launch {
             val t0 = System.currentTimeMillis()
             try {
-                if (_connectionState.value == FusionConnectionState.DISCONNECTED) {
+                // REST event delivery is independent of the live WebSocket.
+                // This also prevents SESSION_ENDED from being delayed when
+                // endSession() closes the stream immediately after dispatch.
+                val response = apiService.reportEvent(request)
+                if (!response.isSuccessful) {
                     queueManager.enqueueEvent(request)
                     withContext(Dispatchers.Main) {
-                        onResult?.invoke(Result.failure(Exception("Event queued for offline retry")))
+                        onResult?.invoke(Result.failure(Exception("Event rejected: HTTP ${response.code()}")))
                     }
                 } else {
-                    val response = apiService.reportEvent(request)
-                    if (!response.isSuccessful) {
-                        queueManager.enqueueEvent(request)
-                        withContext(Dispatchers.Main) {
-                            onResult?.invoke(Result.failure(Exception("Event rejected: HTTP ${response.code()}")))
-                        }
-                    } else {
-                        _sdkLatencyMs.value = (System.currentTimeMillis() - t0).toFloat()
-                        val acknowledgement = response.body()
-                        withContext(Dispatchers.Main) {
-                            if (acknowledgement != null) {
-                                onResult?.invoke(Result.success(acknowledgement))
-                            } else {
-                                onResult?.invoke(Result.failure(Exception("Empty event acknowledgement")))
-                            }
+                    _sdkLatencyMs.value = (System.currentTimeMillis() - t0).toFloat()
+                    val acknowledgement = response.body()
+                    withContext(Dispatchers.Main) {
+                        if (acknowledgement != null) {
+                            onResult?.invoke(Result.success(acknowledgement))
+                        } else {
+                            onResult?.invoke(Result.failure(Exception("Empty event acknowledgement")))
                         }
                     }
                 }

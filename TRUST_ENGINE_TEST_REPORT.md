@@ -54,7 +54,7 @@ This measures the Session Intelligence reducer and local SQLite commit on the ve
 | React production build | `npm run build` in `web` | PASS; 3,148 modules |
 | React assets | Vite output | 1,068,718 bytes |
 | Android debug APK | Gradle 8.11.1 `:app:assembleDebug` with local Android SDK | PASS |
-| Android APK size | `app-debug.apk` | 18,001,991 bytes |
+| Android APK size | `app-debug.apk` | 18,001,651 bytes |
 | Python syntax | `python -m compileall -q api/session_intelligence api/main.py` | PASS |
 
 The Android build also verified and corrected pre-existing blockers: invalid `debuggable` DSL, missing launcher resources, missing `savedInstanceState` call, and missing `MutableStateFlow` import.
