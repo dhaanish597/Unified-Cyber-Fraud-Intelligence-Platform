@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShieldAlert, Briefcase, Users, Radio, Landmark, Share2, FlaskConical, FileCheck2, Sliders, ChevronLeft, ChevronRight, Activity, BarChart3, ChevronDown, Code2 } from 'lucide-react';
+import { LayoutDashboard, ShieldAlert, Briefcase, Users, Radio, Landmark, Share2, FlaskConical, FileCheck2, Sliders, ChevronLeft, ChevronRight, Activity, BarChart3, ChevronDown, Code2, ShieldCheck } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import Tooltip from '../common/Tooltip';
 
@@ -32,6 +32,7 @@ export default function Sidebar() {
       title: 'Fraud Intelligence',
       items: [
         { to: '/threats', label: 'Threat Intelligence', icon: ShieldAlert, badge: 'NEW', highlight: true },
+        { to: '/sessions', label: 'Session Intelligence', icon: ShieldCheck, badge: 'LIVE', highlight: true },
         { to: '/analytics', label: 'Cyber Analytics', icon: BarChart3 },
         { to: '/cases', label: 'Cases Workqueue', icon: Briefcase, badge: '12' },
         { to: '/customers', label: 'Customer Digital Twin', icon: Users }

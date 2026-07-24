@@ -24,6 +24,7 @@ import SettingsPage from './pages/SettingsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DeveloperPlatformPage from './pages/DeveloperPlatformPage';
 import CyberThreatIntelligencePage from './pages/CyberThreatIntelligencePage';
+import SessionIntelligencePage from './pages/SessionIntelligencePage';
 
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
@@ -58,6 +59,7 @@ export default function App() {
                         <Route path="telemetry" element={<TelemetryPage />} />
                         <Route path="analytics" element={<AnalyticsPage />} />
                         <Route path="threats" element={<CyberThreatIntelligencePage />} />
+                        <Route path="sessions" element={<SessionIntelligencePage />} />
                         <Route path="banking" element={<BankingPage />} />
                         <Route path="graph" element={<GraphPage />} />
                         <Route path="lab" element={<SyntheticLabPage />} />
