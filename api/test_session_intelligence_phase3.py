@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import statistics
+import asyncio
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from api.session_intelligence.broker import TrustUpdateBroker
+from api.cyber_threat_engine import CyberThreatEngine
 from api.session_intelligence.engine import SessionIntelligenceEngine
 from api.session_intelligence.models import ComponentName, SessionLifecycle
 from api.session_intelligence.repository import SessionTrustRepository
@@ -241,3 +245,58 @@ def test_registry_supports_one_thousand_sessions(
     sessions = engine.repository.list_sessions(limit=1_000)
     assert len(sessions) == 1_000
     assert all(session.current_state == SessionLifecycle.ACTIVE for session in sessions)
+
+
+def test_threat_engine_objects_drive_trust_without_redetection(
+    trust_engine: SessionIntelligenceEngine,
+) -> None:
+    _start(trust_engine)
+    event = {
+        "session_id": "SESS_PHASE3_TEST",
+        "device_id": "device_phase3",
+        "event_type": "OVERLAY_DETECTED",
+    }
+    threats = CyberThreatEngine().evaluate_event(event)
+    update = trust_engine.process_event(event, threats)
+
+    assert threats
+    assert update.passport.runtime_trust < 100.0
+    assert update.passport.behaviour_trust < 100.0
+    assert update.passport.threat_trust < 100.0
+
+
+def test_multiple_sessions_can_update_concurrently(tmp_path: Path) -> None:
+    engine = SessionIntelligenceEngine(
+        SessionTrustRepository(tmp_path / "phase3-concurrent.db")
+    )
+    session_ids = [f"SESS_CONCURRENT_{index:03d}" for index in range(50)]
+    for session_id in session_ids:
+        _start(engine, session_id)
+
+    def update(session_id: str) -> float:
+        return engine.process_event(
+            {"session_id": session_id, "event_type": "BENEFICIARY_ADDED"}
+        ).passport.behaviour_trust
+
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        scores = list(executor.map(update, session_ids))
+
+    assert scores == [94.0] * 50
+    assert len(engine.repository.list_sessions(limit=100)) == 50
+
+
+@pytest.mark.asyncio
+async def test_websocket_broker_propagates_below_two_hundred_ms() -> None:
+    broker = TrustUpdateBroker()
+    subscription = await broker.subscribe("SESS_STREAM")
+    envelope = {
+        "msg_type": "trust_passport_update",
+        "session_id": "SESS_STREAM",
+    }
+    started = time.perf_counter()
+    await broker.publish(envelope)
+    delivered = await asyncio.wait_for(subscription.queue.get(), timeout=0.2)
+    propagation_ms = (time.perf_counter() - started) * 1000
+
+    assert delivered == envelope
+    assert propagation_ms < 200.0
