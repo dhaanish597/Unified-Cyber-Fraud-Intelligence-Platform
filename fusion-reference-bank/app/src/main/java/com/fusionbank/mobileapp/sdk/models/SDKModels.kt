@@ -7,16 +7,65 @@ data class SDKTokenRequest(
     @SerializedName("client_secret") val clientSecret: String
 )
 
+data class SafeCheckAnalyzeRequest(
+    @SerializedName("qr_payload") val qrPayload: String,
+    @SerializedName("application_id") val applicationId: String = "com.fusionbank.mobileapp",
+    @SerializedName("client_version") val clientVersion: String = "",
+)
+
+data class SafeCheckSignal(
+    val code: String,
+    val severity: String,
+    val message: String,
+)
+
+data class SafeCheckParsedDetails(
+    @SerializedName("payee_address") val payeeAddress: String? = null,
+    @SerializedName("encoded_payee_name") val encodedPayeeName: String? = null,
+    val amount: Double? = null,
+    val currency: String? = null,
+    @SerializedName("transaction_note") val transactionNote: String? = null,
+    val url: String? = null,
+    val host: String? = null,
+)
+
+data class SafeCheckResponse(
+    @SerializedName("riskScore") val riskScore: Int? = null,
+    val confidence: Int,
+    @SerializedName("riskLevel") val riskLevel: String,
+    @SerializedName("qrType") val qrType: String,
+    @SerializedName("parsedDetails") val parsedDetails: SafeCheckParsedDetails,
+    val signals: List<SafeCheckSignal> = emptyList(),
+    val recommendation: String,
+    @SerializedName("assessmentId") val assessmentId: String,
+    @SerializedName("assessedAt") val assessedAt: String,
+)
+
+data class SafeCheckReportRequest(
+    val identifier: String,
+    val category: String,
+    val description: String,
+    val evidence: String? = null,
+)
+
+data class SafeCheckReportResponse(
+    @SerializedName("reportId") val reportId: String,
+    val status: String,
+    val message: String,
+)
+
 data class PairingRegistrationRequest(
     @SerializedName("pair_id") val pairId: String,
     @SerializedName("bootstrap_token") val bootstrapToken: String,
     @SerializedName("device_uuid") val deviceUuid: String,
+    @SerializedName("tenant_id") val tenantId: String,
     @SerializedName("android_version") val androidVersion: String,
     val manufacturer: String,
     val model: String,
     @SerializedName("sdk_version") val sdkVersion: String,
     @SerializedName("app_version") val appVersion: String,
     val fingerprint: String,
+    val environment: String,
 )
 
 data class PairingRegistrationResponse(
@@ -27,6 +76,8 @@ data class PairingRegistrationResponse(
     @SerializedName("expires_at") val expiresAt: Long,
     @SerializedName("backend_url") val backendUrl: String,
     @SerializedName("ws_url") val wsUrl: String,
+    @SerializedName("tenant_id") val tenantId: String = "",
+    @SerializedName("environment") val environment: String = "PRODUCTION",
 )
 
 data class SDKTokenResponse(

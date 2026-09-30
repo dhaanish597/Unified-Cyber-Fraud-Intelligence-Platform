@@ -15,6 +15,8 @@ class PairingRecord:
     bootstrap_token_hash: str
     backend_url: str
     ws_url: str
+    tenant_id: str
+    environment: str
     expires_at: float
     created_at: float
     used: bool = False
@@ -23,6 +25,8 @@ class PairingRecord:
         return {
             "backend": self.backend_url,
             "ws": self.ws_url,
+            "tenantId": self.tenant_id,
+            "environment": self.environment,
             "pairId": self.pair_id,
             "bootstrapToken": None,
             "expires": datetime.fromtimestamp(self.expires_at, tz=timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -39,7 +43,7 @@ class PairingRegistry:
         now = time.time()
         self.records = {key: value for key, value in self.records.items() if value.expires_at > now}
 
-    def create(self, backend_url: str, ws_url: str) -> dict[str, Any]:
+    def create(self, backend_url: str, ws_url: str, tenant_id: str, environment: str) -> dict[str, Any]:
         self._purge()
         pair_id = f"PAIR_{secrets.token_hex(3).upper()}"
         token = secrets.token_urlsafe(24)
@@ -48,6 +52,8 @@ class PairingRegistry:
             bootstrap_token_hash=hashlib.sha256(token.encode()).hexdigest(),
             backend_url=backend_url.rstrip("/"),
             ws_url=ws_url.rstrip("/"),
+            tenant_id=tenant_id,
+            environment=environment,
             expires_at=time.time() + self.ttl_seconds,
             created_at=time.time(),
         )
@@ -56,10 +62,10 @@ class PairingRegistry:
         payload["bootstrapToken"] = token
         return {"pairing": payload, "pair_id": pair_id, "expires_in": self.ttl_seconds}
 
-    def consume(self, pair_id: str, token: str) -> PairingRecord | None:
+    def consume(self, pair_id: str, token: str, tenant_id: str | None = None) -> PairingRecord | None:
         self._purge()
         record = self.records.get(pair_id)
-        if not record or record.used or record.expires_at <= time.time():
+        if not record or record.used or record.expires_at <= time.time() or (tenant_id and record.tenant_id != tenant_id):
             return None
         supplied = hashlib.sha256(token.encode()).hexdigest()
         if not secrets.compare_digest(supplied, record.bootstrap_token_hash):

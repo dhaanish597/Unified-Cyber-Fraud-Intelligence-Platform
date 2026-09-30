@@ -14,6 +14,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -120,6 +121,47 @@ object Fusion {
         Log.i(TAG, "Fusion SDK initialized: ${config.sdkVersion}")
     }
 
+    fun analyzeSafeCheck(payload: String, onResult: (Result<SafeCheckResponse>) -> Unit) {
+        checkInitialized()
+        scope.launch {
+            try {
+                val response = apiService.analyzeSafeCheck(
+                    SafeCheckAnalyzeRequest(payload, config.appId, BuildConfig.VERSION_NAME)
+                )
+                val body = response.body()
+                if (!response.isSuccessful || body == null) {
+                    throw backendError("SafeCheck assessment", response.code())
+                }
+                deliver(onResult, Result.success(body))
+            } catch (exception: Exception) {
+                deliver(onResult, Result.failure(exception))
+            }
+        }
+    }
+
+    fun reportSafeCheck(
+        identifier: String,
+        category: String,
+        description: String,
+        onResult: (Result<SafeCheckReportResponse>) -> Unit,
+    ) {
+        checkInitialized()
+        scope.launch {
+            try {
+                val response = apiService.reportPaymentIdentifier(
+                    SafeCheckReportRequest(identifier, category, description)
+                )
+                val body = response.body()
+                if (!response.isSuccessful || body == null) {
+                    throw backendError("SafeCheck report", response.code())
+                }
+                deliver(onResult, Result.success(body))
+            } catch (exception: Exception) {
+                deliver(onResult, Result.failure(exception))
+            }
+        }
+    }
+
     /** Configure a freshly installed APK from a Developer Portal pairing payload. */
     fun pair(context: Context, payload: String, onResult: (Result<PairingRegistrationResponse>) -> Unit) {
         scope.launch {
@@ -129,6 +171,12 @@ object Fusion {
                 val ws = json.getString("ws")
                 val pairId = json.getString("pairId")
                 val bootstrap = json.getString("bootstrapToken")
+                val tenantId = json.optString("tenantId", BuildConfig.TENANT_ID)
+                check(tenantId == BuildConfig.TENANT_ID) { "Pairing QR belongs to a different tenant" }
+                val environment = json.optString(
+                    "environment",
+                    if (BuildConfig.DEBUG) "DEVELOPMENT" else "PRODUCTION",
+                )
                 isInitialized = false
                 initialize(context, FusionConfig(
                     baseUrl = backend,
@@ -136,7 +184,7 @@ object Fusion {
                     appId = "com.fusionbank.mobileapp",
                     tenantId = BuildConfig.TENANT_ID,
                     sdkVersion = BuildConfig.SDK_VERSION,
-                    environment = "DEMO"
+                    environment = environment
                 ))
                 val request = PairingRegistrationRequest(
                     pairId = pairId,
@@ -148,6 +196,8 @@ object Fusion {
                     sdkVersion = BuildConfig.SDK_VERSION,
                     appVersion = BuildConfig.VERSION_NAME,
                     fingerprint = Build.FINGERPRINT,
+                    tenantId = tenantId,
+                    environment = environment,
                 )
                 val response = apiService.registerPairedDevice(request)
                 val body = response.body()
@@ -155,7 +205,21 @@ object Fusion {
                     throw backendError("Pairing", response.code())
                 }
                 persistPairing(body)
-                deliver(onResult, Result.success(body))
+                // QR pairing is the authentication bootstrap. Do not report
+                // success until the backend has also accepted the SDK session
+                // and the authenticated realtime connection is established.
+                scope.launch {
+                    try {
+                        startSessionInternal(body.deviceId) { sessionResult ->
+                            sessionResult.fold(
+                                onSuccess = { scope.launch { deliver(onResult, Result.success(body)) } },
+                                onFailure = { error -> scope.launch { deliver(onResult, Result.failure(error)) } },
+                            )
+                        }
+                    } catch (exception: Exception) {
+                        deliver(onResult, Result.failure(exception))
+                    }
+                }
             } catch (exception: Exception) {
                 deliver(onResult, Result.failure(exception))
             }
@@ -242,6 +306,22 @@ object Fusion {
         }
     }
 
+    /** Restore a QR-paired SDK session without requiring a banking password. */
+    fun restorePairedSession(onResult: (Result<SDKSessionResponse>) -> Unit) {
+        checkInitialized()
+        scope.launch {
+            try {
+                ensureValidAccessToken()
+                val deviceId = secureStorage.getString(SecureStorage.KEY_DEVICE_ID)
+                    ?: throw IllegalStateException("No paired device")
+                startSessionInternal(deviceId, onResult)
+            } catch (exception: Exception) {
+                clearLocalSession()
+                deliver(onResult, Result.failure(exception))
+            }
+        }
+    }
+
     @Deprecated("Use login() so banking identity is authenticated before SDK session creation")
     fun startSession(userId: String, onResult: (Result<SDKSessionResponse>) -> Unit) {
         checkInitialized()
@@ -293,6 +373,9 @@ object Fusion {
         secureStorage.saveString(SecureStorage.KEY_USER_ID, userId)
         _sdkLatencyMs.value = (System.currentTimeMillis() - started).toFloat()
         webSocketManager.connect(session.sessionId)
+        withTimeout(15_000L) {
+            connectionState.first { it == FusionConnectionState.CONNECTED }
+        }
         startBehaviorCollection(appContext)
         startTelemetryLoop(appContext)
         reportEvent("SESSION_STARTED")

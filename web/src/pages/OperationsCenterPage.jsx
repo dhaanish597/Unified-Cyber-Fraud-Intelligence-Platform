@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy } from 'react';
-import { authenticatedWebSocketUrl, authenticatedWebSocketProtocols } from '../platformAuth';
+import { API_BASE, authenticatedWebSocketUrl, authenticatedWebSocketProtocols } from '../platformAuth';
 import { useNavigate } from 'react-router-dom';
 import {
   Bot, BookOpen, ExternalLink, Fingerprint, Landmark, Radio, RefreshCw, Search, ShieldAlert,
@@ -24,7 +24,6 @@ const NarrativeAIStoryteller = lazy(() => import('../components/runtime/Narrativ
 const AICopilotPanel = lazy(() => import('../components/copilot/AICopilotPanel'));
 const FraudDevToolsInspector = lazy(() => import('../components/runtime/FraudDevToolsInspector'));
 
-const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8000' : '');
 const WS_BASE = API_BASE.replace(/^http/, 'ws');
 const QUEUE_PATH = '/cases?page_size=25&sort=-created_at';
 
@@ -44,11 +43,13 @@ export default function OperationsCenterPage() {
   const [apiLatency, setApiLatency] = useState(null);
   const [wsConnected, setWsConnected] = useState(false);
   const [blockedValue, setBlockedValue] = useState(null);
+  const [safeAssessments, setSafeAssessments] = useState([]);
 
   const wsRef = useRef(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/analytics/summary?period=24h`).then((response) => response.json()).then((body) => setBlockedValue((body.data || body).totals?.blocked_amount ?? null)).catch(() => setBlockedValue(null));
+    fetch(`${API_BASE}/risk/qr/assessments`).then((response) => response.ok ? response.json() : null).then((body) => setSafeAssessments(body?.assessments || body?.data?.assessments || [])).catch(() => setSafeAssessments([]));
     connectWebSocket();
     return () => {
       if (wsRef.current) wsRef.current.close();
@@ -65,6 +66,9 @@ export default function OperationsCenterPage() {
     wsRef.current.onmessage = async (evt) => {
       try {
         const data = JSON.parse(evt.data);
+        if (data.event_type === 'QR_RISK_ASSESSMENT') {
+          setSafeAssessments((prev) => [data, ...prev.filter((item) => item.assessment_id !== data.assessment_id)].slice(0, 50));
+        }
         if (data.msg_type === 'status') return;
         if (data.msg_type === 'pipeline_overview') setWebsocketStages([]);
         if (data.msg_type === 'pipeline_stage') setWebsocketStages((prev) => [...prev, data]);
@@ -199,6 +203,28 @@ export default function OperationsCenterPage() {
           </div>
         </div>
       </header>
+
+      <section className="rounded-xl border border-soc-border bg-soc-panel p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-soc-text">Fusion SafeCheck assessments</h2>
+            <p className="text-xs text-soc-muted">Sanitized QR risk signals received from the public safety surface.</p>
+          </div>
+          <span className="font-mono text-xs text-soc-info">{safeAssessments.length}</span>
+        </div>
+        {safeAssessments.length ? (
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {safeAssessments.slice(0, 8).map((item) => (
+              <div key={item.assessment_id || item.assessmentId} className="rounded-lg border border-soc-border bg-soc-surface p-3">
+                <div className="flex justify-between text-xs font-bold text-soc-text"><span>{item.qr_type || item.qrType}</span><span>{item.risk_level || item.riskLevel}</span></div>
+                <div className="mt-1 font-mono text-[10px] text-soc-muted">{item.assessment_id || item.assessmentId}</div>
+                <div className="mt-2 text-[11px] text-soc-muted">Risk {item.risk_score ?? item.riskScore ?? '—'} · Confidence {item.confidence ?? '—'}%</div>
+                <div className="mt-1 text-[10px] text-soc-dim">Reports {item.report_count ?? item.reportCount ?? 0} · {item.timestamp || item.assessedAt}</div>
+              </div>
+            ))}
+          </div>
+        ) : <p className="text-xs text-soc-muted">No SafeCheck assessments received yet.</p>}
+      </section>
 
       {/* Nothing is selected until an analyst clicks or a live BLOCK arrives,
           and when the view auto-selects it says so. */}

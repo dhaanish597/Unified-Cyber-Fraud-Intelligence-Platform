@@ -30,15 +30,21 @@ class FusionWebSocketManager(
 
     private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var reconnectAttempt = 0
+    private var reconnectJob: Job? = null
     private var isIntentionallyClosed = false
     private var activeSessionId: String? = null
     private val gson = Gson()
+
+    private companion object {
+        const val MAX_RECONNECT_ATTEMPTS = 5
+    }
 
     fun connect(sessionId: String) {
         if (_connectionState.value == FusionConnectionState.CONNECTED) return
 
         activeSessionId = sessionId
         isIntentionallyClosed = false
+        reconnectJob?.cancel()
         _connectionState.value = FusionConnectionState.SYNCING
 
         client = OkHttpClient.Builder()
@@ -61,6 +67,7 @@ class FusionWebSocketManager(
                 Log.d(TAG, "WebSocket connected successfully to $wsUrl")
                 _connectionState.value = FusionConnectionState.CONNECTED
                 reconnectAttempt = 0
+                reconnectJob?.cancel()
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -100,12 +107,17 @@ class FusionWebSocketManager(
 
     private fun scheduleReconnect() {
         if (isIntentionallyClosed) return
+        if (reconnectJob?.isActive == true) return
+        if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+            Log.w(TAG, "WebSocket reconnect limit reached; user action is required")
+            return
+        }
 
         reconnectAttempt++
-        val delayMs = (2000L * reconnectAttempt).coerceAtMost(30000L)
+        val delayMs = (1000L * (1L shl (reconnectAttempt - 1).coerceAtMost(4))).coerceAtMost(16000L)
         Log.d(TAG, "Scheduling reconnect attempt #$reconnectAttempt in ${delayMs}ms")
         
-        scope.launch {
+        reconnectJob = scope.launch {
             delay(delayMs)
             if (!isIntentionallyClosed && _connectionState.value != FusionConnectionState.CONNECTED) {
                 activeSessionId?.let(::connect)
@@ -115,6 +127,9 @@ class FusionWebSocketManager(
 
     fun disconnect() {
         isIntentionallyClosed = true
+        reconnectJob?.cancel()
+        reconnectJob = null
+        reconnectAttempt = 0
         webSocket?.close(1000, "Client initiated disconnect")
         webSocket = null
         activeSessionId = null

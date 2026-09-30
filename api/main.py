@@ -72,13 +72,15 @@ from api.core_platform.notifications import notification_service
 from api.gateway_integration import router as gateway_router
 from api.identity_trust.router import router as identity_router
 from api.copilot_engine import router as copilot_router
+from api.rrr_router import router as rrr_router
+from api.safecheck import router as safecheck_router
 
 
 
 
 
 
-app = FastAPI(title="Fuzen AI", version="2.5.0")
+app = FastAPI(title="Fuzen AI / RRR Investigator", version="2.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -94,6 +96,8 @@ app.include_router(gateway_router)
 app.include_router(banking_auth_router)
 app.include_router(identity_router)
 app.include_router(copilot_router)
+app.include_router(rrr_router)
+app.include_router(safecheck_router)
 _active_websocket_sessions: set[str] = set()
 
 @app.post("/auth/login")
@@ -128,24 +132,31 @@ class DeviceRegistrationRequest(BaseModel):
     pair_id: str
     bootstrap_token: str
     device_uuid: str
+    tenant_id: str | None = None
     android_version: str = "unknown"
     manufacturer: str = "unknown"
     model: str = "unknown"
     sdk_version: str = "unknown"
     app_version: str = "unknown"
     fingerprint: str = ""
+    environment: str = "PRODUCTION"
 
 
 @app.post("/device/pair")
 async def create_device_pairing(req: PairingRequest, request: Request):
     backend = req.backend_url or str(request.base_url).rstrip("/")
     ws = req.ws_url or backend.replace("https://", "wss://").replace("http://", "ws://") + "/ws/stream"
-    return pairing_registry.create(backend, ws)
+    return pairing_registry.create(
+        backend,
+        ws,
+        tenant_id=platform_settings.default_tenant_id,
+        environment=platform_settings.environment.upper(),
+    )
 
 
 @app.post("/device/register")
 async def register_paired_device(req: DeviceRegistrationRequest):
-    record = pairing_registry.consume(req.pair_id, req.bootstrap_token)
+    record = pairing_registry.consume(req.pair_id, req.bootstrap_token, req.tenant_id)
     if not record:
         raise HTTPException(status_code=401, detail="Pairing token is invalid, expired, or already used")
     device = pairing_registry.register_device(req.pair_id, req.model_dump())
@@ -173,6 +184,8 @@ async def register_paired_device(req: DeviceRegistrationRequest):
         "expires_at": expires_at,
         "backend_url": record.backend_url,
         "ws_url": record.ws_url,
+        "tenant_id": record.tenant_id,
+        "environment": record.environment,
     }
 
 

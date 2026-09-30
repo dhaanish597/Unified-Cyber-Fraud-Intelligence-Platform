@@ -118,7 +118,7 @@ fun PairingScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text("Device Paired!", color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text("Redirecting to login…", color = TextSecondaryDark, style = MaterialTheme.typography.bodySmall)
+                Text("Establishing secure session…", color = TextSecondaryDark, style = MaterialTheme.typography.bodySmall)
             } else {
                 // Animated QR target
                 Box(
@@ -252,7 +252,7 @@ fun PairingScreen(
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondaryDark)
                     ) {
-                        Text("Already paired? Go to Login")
+                        Text("Already paired? Reconnect")
                         Spacer(Modifier.width(6.dp))
                         Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
                     }

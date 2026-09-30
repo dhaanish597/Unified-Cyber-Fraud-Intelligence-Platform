@@ -9,6 +9,16 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface FusionApiService {
+    @POST("risk/qr/analyze")
+    suspend fun analyzeSafeCheck(
+        @Body request: SafeCheckAnalyzeRequest
+    ): Response<SafeCheckResponse>
+
+    @POST("reports/payment-identifier")
+    suspend fun reportPaymentIdentifier(
+        @Body request: SafeCheckReportRequest
+    ): Response<SafeCheckReportResponse>
+
     @POST("identity/register")
     suspend fun registerIdentity(
         @Body request: IdentityRegistrationRequest

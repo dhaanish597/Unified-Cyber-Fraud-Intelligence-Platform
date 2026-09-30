@@ -37,6 +37,8 @@ PUBLIC_PATHS = {
     "/gateway/webhook",
     "/device/pair",
     "/device/register",
+    "/risk/qr/analyze",
+    "/reports/payment-identifier",
 }
 
 
