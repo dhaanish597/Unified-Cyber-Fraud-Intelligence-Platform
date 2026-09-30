@@ -83,7 +83,7 @@ class FusionAdaptiveTrustSDKEngine:
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")
         session = {
             "session_id": session_id,
-            "app_id": data.get("app_id") or os.getenv("FUSION_DEFAULT_APP_ID", "com.fuzenbank.mobileapp"),
+            "app_id": data.get("app_id") or os.getenv("FUSION_DEFAULT_APP_ID", "com.fusionbank.mobileapp"),
             "tenant_id": data.get("tenant_id") or os.getenv("FUSION_DEFAULT_TENANT_ID", "TENANT_FUSB_001"),
             "sdk_version": data.get("sdk_version", "FAT-SDK v2.4.1"),
             "user_id": data.get("user_id", "usr_sdk_demo"),

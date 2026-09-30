@@ -68,7 +68,7 @@ class PlatformSettings:
         default_factory=lambda: os.getenv("FUSION_DEFAULT_TENANT_ID", "TENANT_FUSB_001")
     )
     default_app_id: str = field(
-        default_factory=lambda: os.getenv("FUSION_DEFAULT_APP_ID", "com.fuzenbank.mobileapp")
+        default_factory=lambda: os.getenv("FUSION_DEFAULT_APP_ID", "com.fusionbank.mobileapp")
     )
     neo4j_uri: str | None = field(default_factory=lambda: os.getenv("NEO4J_URI"))
     neo4j_username: str | None = field(default_factory=lambda: os.getenv("NEO4J_USERNAME"))

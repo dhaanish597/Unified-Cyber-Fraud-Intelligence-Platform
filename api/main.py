@@ -168,7 +168,10 @@ async def register_paired_device(req: DeviceRegistrationRequest):
         **configured_client,
         "roles": ["sdk"],
         "tenant_id": configured_client.get("tenant_id") or os.getenv("FUSION_DEFAULT_TENANT_ID", ""),
-        "app_id": configured_client.get("app_id") or os.getenv("FUSION_DEFAULT_APP_ID", "com.fusionbank.mobileapp"),
+        # Pairing is the bootstrap path for the canonical Fusion APK. A stale
+        # app_id inside the deployment's legacy client JSON must not mint a
+        # token that the current APK can never use at /sdk/session/start.
+        "app_id": platform_settings.default_app_id,
     }
     if not client["tenant_id"]:
         raise HTTPException(status_code=503, detail="SDK authentication client has no tenant scope")
